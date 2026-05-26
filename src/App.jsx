@@ -8,7 +8,7 @@ import {
   MASTER_HASH,
   DEMO_HASH
 } from './utils/mockData';
-import { database } from './utils/supabaseClient';
+import { database, sanitizeUAEPhone, isValidUAEPhone } from './utils/supabaseClient';
 import { integrationServices } from './utils/deliveryServices';
 import logoNoBg from './assets/logo_no_bg.png';
 import elixyrEmblem from './assets/elixyr_emblem.jpg';
@@ -158,6 +158,9 @@ function App() {
     paymentMethod: 'WhatsApp Order Concierge',
     items: []
   });
+  const [manualOrderError, setManualOrderError] = useState(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncNotification, setSyncNotification] = useState(null);
 
   useEffect(() => {
     setActiveImageIdx(0);
@@ -318,6 +321,15 @@ function App() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        // Automatically sync any local fallback orders to Supabase cloud on startup
+        if (database.syncLocalOrders) {
+          try {
+            await database.syncLocalOrders();
+          } catch (syncErr) {
+            console.error("⚜️ Elixyr Integration Core: Syncing local fallback orders failed on mount:", syncErr);
+          }
+        }
+
         let dbProducts = await database.getProducts();
         // Force reseed if database local storage has outdated 8 products
         if (dbProducts.length < 20) {
@@ -452,11 +464,10 @@ function App() {
       return;
     }
 
-    // Phone Number validation (+971, max 13 characters including +971, followed by 9-digit number)
-    const cleanPhone = checkoutForm.phone.replace(/\s+/g, '');
-    const phoneRegex = /^\+971\d{9}$/;
-    if (!phoneRegex.test(cleanPhone)) {
-      setCheckoutError("Invalid Phone Number: Must start with +971 followed by a 9-digit number with no spaces (e.g., +971501234567, max 13 characters total).");
+    // Robust UAE Phone Number validation & sanitization
+    const cleanPhone = sanitizeUAEPhone(checkoutForm.phone);
+    if (!isValidUAEPhone(cleanPhone)) {
+      setCheckoutError("Invalid Phone Number: Please enter a valid UAE mobile or area number (e.g. +971501234567, 0501234567, or 501234567).");
       return;
     }
 
@@ -567,6 +578,50 @@ function App() {
     } else {
       alert("Security Authentication Failed: Invalid Passcode.");
       setAdminPasscode('');
+    }
+  };
+
+  const handleForceSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    setSyncNotification({ type: 'info', message: '⚜️ Connecting to Supabase Cloud & syncing fallback orders...' });
+    
+    try {
+      const result = await database.syncLocalOrders();
+      if (result.success) {
+        // Re-load the database orders to refresh the UI registry
+        const dbOrders = await database.getOrders();
+        setOrders(dbOrders);
+
+        if (result.syncedCount > 0) {
+          setSyncNotification({ 
+            type: 'success', 
+            message: `⚜️ Sync Completed: Successfully uploaded ${result.syncedCount} fallback order(s) to Supabase!` 
+          });
+        } else {
+          setSyncNotification({ 
+            type: 'success', 
+            message: '⚜️ Sync Completed: Cloud database is fully up-to-date. No unsynced records.' 
+          });
+        }
+      } else {
+        setSyncNotification({ 
+          type: 'error', 
+          message: `⚠️ Sync Failed: ${result.reason || 'Cloud database offline.'}` 
+        });
+      }
+    } catch (err) {
+      console.error("Manual Force Sync error:", err);
+      setSyncNotification({ 
+        type: 'error', 
+        message: '⚠️ Sync Failed: Critical connection or database exception.' 
+      });
+    } finally {
+      setIsSyncing(false);
+      // Auto-clear notification after 5 seconds
+      setTimeout(() => {
+        setSyncNotification(null);
+      }, 5000);
     }
   };
 
@@ -2623,9 +2678,35 @@ function App() {
                     {adminActiveTab === 'categories' && '🏷️ Product Categories Manager'}
                     {adminActiveTab === 'statuses' && '⚙️ Order Fulfillment Statuses'}
                   </h2>
-                  <span style={{fontSize: '0.7rem', color: 'var(--text-tertiary)', letterSpacing: '1px'}}>
-                    SESSION SECURED (SHA-256)
-                  </span>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
+                    <span className="admin-status-pill" style={{
+                      margin: 0,
+                      backgroundColor: database.isCloudConnected() ? 'rgba(46, 204, 113, 0.08)' : 'rgba(230, 126, 34, 0.08)',
+                      color: database.isCloudConnected() ? '#2ecc71' : '#e67e22',
+                      border: database.isCloudConnected() ? '1px solid rgba(46, 204, 113, 0.15)' : '1px solid rgba(230, 126, 34, 0.15)',
+                      fontSize: '0.65rem',
+                      fontWeight: '700',
+                      letterSpacing: '0.5px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '4px 8px',
+                      borderRadius: '4px'
+                    }}>
+                      <span style={{
+                        width: '6px',
+                        height: '6px',
+                        borderRadius: '50%',
+                        backgroundColor: database.isCloudConnected() ? '#2ecc71' : '#e67e22',
+                        boxShadow: database.isCloudConnected() ? '0 0 8px #2ecc71' : '0 0 8px #e67e22',
+                        display: 'inline-block'
+                      }} />
+                      {database.isCloudConnected() ? '⚜️ CLOUD ACTIVE' : '⚠️ LOCAL FALLBACK'}
+                    </span>
+                    <span style={{fontSize: '0.7rem', color: 'var(--text-tertiary)', letterSpacing: '1px'}}>
+                      SESSION SECURED (SHA-256)
+                    </span>
+                  </div>
                 </div>
 
                 {/* Dashboard Tab 1: OVERVIEW */}
@@ -3205,24 +3286,73 @@ function App() {
                   <div>
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px'}}>
                       <h3 className="admin-form-title" style={{margin: 0}}>Customer Orders Registry</h3>
-                      <button 
-                        className="admin-tag-toggle" 
-                        onClick={() => {
-                          setManualOrderForm({
-                            fullName: '',
-                            phone: '+971',
-                            email: '',
-                            emirate: 'Dubai (15 AED)',
-                            paymentMethod: 'WhatsApp Order Concierge',
-                            items: []
-                          });
-                          setIsCreatingOrder(true);
-                        }}
-                        style={{padding: '8px 16px', fontSize: '0.75rem'}}
-                      >
-                        + Create Manual Order
-                      </button>
+                      <div style={{display: 'flex', gap: '8px'}}>
+                        <button
+                          type="button"
+                          className="admin-tag-toggle"
+                          onClick={handleForceSync}
+                          disabled={isSyncing}
+                          style={{
+                            padding: '8px 16px', 
+                            fontSize: '0.75rem', 
+                            backgroundColor: isSyncing ? 'rgba(255, 255, 255, 0.05)' : 'rgba(218, 165, 32, 0.06)', 
+                            border: '1px solid rgba(218, 165, 32, 0.2)',
+                            color: 'var(--accent-gold)',
+                            cursor: isSyncing ? 'not-allowed' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          {isSyncing ? '⚜️ SYNCING...' : '🔄 FORCE CLOUD SYNC'}
+                        </button>
+                        <button 
+                          className="admin-tag-toggle" 
+                          onClick={() => {
+                            setManualOrderForm({
+                              fullName: '',
+                              phone: '+971',
+                              email: '',
+                              emirate: 'Dubai (15 AED)',
+                              paymentMethod: 'WhatsApp Order Concierge',
+                              items: []
+                            });
+                            setManualOrderError(null);
+                            setIsCreatingOrder(true);
+                          }}
+                          style={{padding: '8px 16px', fontSize: '0.75rem'}}
+                        >
+                          + Create Manual Order
+                        </button>
+                      </div>
                     </div>
+
+                    {syncNotification && (
+                      <div style={{
+                        padding: '12px 16px',
+                        marginBottom: '16px',
+                        borderRadius: '2px',
+                        fontSize: '0.75rem',
+                        fontWeight: '500',
+                        letterSpacing: '0.02em',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        lineHeight: '1.4',
+                        backgroundColor: 
+                          syncNotification.type === 'success' ? 'rgba(46, 204, 113, 0.08)' :
+                          syncNotification.type === 'error' ? 'rgba(192, 57, 43, 0.08)' : 'rgba(218, 165, 32, 0.08)',
+                        color: 
+                          syncNotification.type === 'success' ? '#2ecc71' :
+                          syncNotification.type === 'error' ? '#c0392b' : 'var(--accent-gold)',
+                        border: 
+                          syncNotification.type === 'success' ? '1px solid rgba(46, 204, 113, 0.15)' :
+                          syncNotification.type === 'error' ? '1px solid rgba(192, 57, 43, 0.15)' : '1px solid rgba(218, 165, 32, 0.15)',
+                      }}>
+                        <span>{syncNotification.type === 'success' ? '⚜️' : syncNotification.type === 'error' ? '⚠️' : '⚜️'}</span>
+                        <span>{syncNotification.message}</span>
+                      </div>
+                    )}
                     <div className="admin-table-box">
                       <table className="admin-table">
                         <thead>
@@ -3927,30 +4057,53 @@ function App() {
               <h2 className="font-serif" style={{fontSize: '2rem'}}>Create Manual Order</h2>
               <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '20px'}}>Create a custom secure order record for WhatsApp or phone booking clients.</p>
 
+              {manualOrderError && (
+                <div className="checkout-error-banner" role="alert" style={{
+                  color: '#c0392b',
+                  fontSize: '0.8rem',
+                  marginBottom: '20px',
+                  padding: '12px 16px',
+                  border: '1px solid rgba(192, 57, 43, 0.2)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderRadius: '2px',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: '500',
+                  letterSpacing: '0.02em',
+                  lineHeight: '1.4'
+                }}>
+                  <span style={{ fontSize: '1rem', color: '#c0392b' }}>⚠️</span>
+                  <span>{manualOrderError}</span>
+                </div>
+              )}
+
               <form onSubmit={(e) => {
                 e.preventDefault();
                 
-                // Validate phone
-                const cleanPhone = manualOrderForm.phone.replace(/\s+/g, '');
-                const phoneRegex = /^\+971\d{9}$/;
-                if (!phoneRegex.test(cleanPhone)) {
-                  alert("Invalid Phone: Must start with +971 followed by 9 digits (max 13 characters total).");
+                // Validate phone using new smart sanitizer
+                const cleanPhone = sanitizeUAEPhone(manualOrderForm.phone);
+                if (!isValidUAEPhone(cleanPhone)) {
+                  setManualOrderError("Invalid Phone: Please enter a valid UAE mobile or area number (e.g. +971501234567, 0501234567, or 501234567).");
                   return;
                 }
 
                 // Validate email
                 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                 if (manualOrderForm.email && !emailRegex.test(manualOrderForm.email)) {
-                  alert("Invalid Email format.");
+                  setManualOrderError("Invalid Email: Please provide a valid email address (e.g., name@example.com).");
                   return;
                 }
 
                 // Validate items
                 const selectedItems = manualOrderForm.items.filter(item => item.qty > 0);
                 if (selectedItems.length === 0) {
-                  alert("Please add at least one fragrance to this manual order.");
+                  setManualOrderError("Fragrance Registry empty: Please add at least one fragrance to this manual order.");
                   return;
                 }
+
+                setManualOrderError(null);
 
                 // Calculate costs
                 const subtotal = selectedItems.reduce((sum, item) => sum + (item.price * item.qty), 0);

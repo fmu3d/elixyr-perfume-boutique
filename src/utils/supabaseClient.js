@@ -71,9 +71,118 @@ const saveLocalBlogs = (blogs) => {
   localStorage.setItem('elixyr_blogs_v2', JSON.stringify(blogs));
 };
 
+// =========================================================================
+// SMART UAE PHONE SANITIZER & VALIDATORS
+// =========================================================================
+export const sanitizeUAEPhone = (phone) => {
+  if (!phone) return '';
+  let rawPhone = phone.replace(/[\s\-\(\)\+]/g, ''); // strip spaces, dashes, brackets, and plusses
+  
+  if (rawPhone.startsWith('00971')) {
+    return '+' + rawPhone.slice(2);
+  } else if (rawPhone.startsWith('971')) {
+    return '+' + rawPhone;
+  } else if (rawPhone.startsWith('0') && rawPhone.length === 10) {
+    return '+971' + rawPhone.slice(1);
+  } else if (rawPhone.length === 9) {
+    return '+971' + rawPhone;
+  }
+  // Fallback: trim and clean spacing, prepend plus if they entered it
+  return (phone.trim().startsWith('+') ? '' : '+') + phone.replace(/\s+/g, '');
+};
+
+export const isValidUAEPhone = (phone) => {
+  const sanitized = sanitizeUAEPhone(phone);
+  return /^\+971\d{9}$/.test(sanitized);
+};
+
 export const database = {
   // Check active cloud state
   isCloudConnected: () => !!supabase,
+
+  // Sync local orders to cloud Supabase if they are missing
+  async syncLocalOrders() {
+    if (!supabase) {
+      console.log('⚜️ Supabase Auto-Sync: Cloud database not connected. Skipping sync.');
+      return { success: false, syncedCount: 0, reason: 'No cloud connection' };
+    }
+    try {
+      // 1. Fetch existing orders from Supabase to match by order_number/id
+      const { data: cloudOrders, error } = await supabase
+        .from('orders')
+        .select('id, order_number');
+      
+      if (error) {
+        console.error('⚜️ Supabase Auto-Sync: Failed to fetch cloud order keys for matching.', error);
+        return { success: false, syncedCount: 0, error };
+      }
+
+      const cloudKeys = new Set();
+      cloudOrders.forEach(o => {
+        if (o.id) cloudKeys.add(o.id.toString());
+        if (o.order_number) cloudKeys.add(o.order_number.toString());
+      });
+
+      // 2. Fetch local orders
+      const localOrders = getLocalOrders();
+      if (!localOrders || localOrders.length === 0) {
+        console.log('⚜️ Supabase Auto-Sync: No local fallback orders to sync.');
+        return { success: true, syncedCount: 0 };
+      }
+
+      // 3. Find orders that are missing in the cloud
+      const missingOrders = localOrders.filter(o => {
+        const hasId = o.id && cloudKeys.has(o.id.toString());
+        const hasNumber = o.order_number && cloudKeys.has(o.order_number.toString());
+        return !hasId && !hasNumber;
+      });
+
+      if (missingOrders.length === 0) {
+        console.log('⚜️ Supabase Auto-Sync: All local orders are already in the cloud.');
+        return { success: true, syncedCount: 0 };
+      }
+
+      console.log(`⚜️ Supabase Auto-Sync: Found ${missingOrders.length} local fallback order(s) missing in cloud. Syncing...`);
+      
+      let syncSuccessCount = 0;
+      for (const order of missingOrders) {
+        // Construct standard record to match Supabase schema
+        const dbRecord = {
+          id: order.id,
+          order_number: order.order_number,
+          client_name: order.client_name,
+          email: order.email || '',
+          phone: order.phone,
+          emirate: order.emirate,
+          payment_method: order.payment_method,
+          items: order.items,
+          subtotal: order.subtotal,
+          delivery_fee: order.delivery_fee,
+          total_amount: order.total_amount,
+          status: order.status || 'pending',
+          tracking_number: order.tracking_number || null,
+          tracking_link: order.tracking_link || null,
+          created_at: order.created_at || new Date().toISOString()
+        };
+
+        const { error: insertError } = await supabase
+          .from('orders')
+          .insert([dbRecord]);
+
+        if (insertError) {
+          console.error(`⚜️ Supabase Auto-Sync: Failed to sync order ${order.order_number || order.id}`, insertError);
+        } else {
+          console.log(`⚜️ Supabase Auto-Sync: Successfully uploaded order ${order.order_number || order.id} to cloud.`);
+          syncSuccessCount++;
+        }
+      }
+
+      return { success: true, syncedCount: syncSuccessCount };
+    } catch (err) {
+      console.error('⚜️ Supabase Auto-Sync: Critical error during local orders sync.', err);
+      return { success: false, syncedCount: 0, error: err };
+    }
+  },
 
   // =========================================================================
   // ORDERS CRUD METHODS
