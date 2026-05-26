@@ -4606,7 +4606,7 @@ function App() {
             borderTop: '1px solid rgba(197, 168, 128, 0.08)',
             paddingTop: '30px',
             display: 'flex',
-            justify-content: 'space-between',
+            justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
             gap: '20px',
