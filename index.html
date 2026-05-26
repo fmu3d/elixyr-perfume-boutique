@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary SEO Metadata -->
+    <title>ELIXYR — Luxury Perfume House | Dubai & UAE Collection</title>
+    <meta name="description" content="Discover Elixyr, a premier Emirati fragrance boutique crafting ultimate signature extraits of agarwood, red saffron, and warm ambergris. Hand-assembled luxury." />
+    <meta name="keywords" content="Elixyr perfume, luxury perfume Dubai, UAE fragrance house, agarwood oud, red saffron extract, organic ambergris, discovery set UAE" />
+    
+    <!-- Real-time Browser Error Capture Diagnostic -->
+    <script>
+      window.addEventListener('error', function(e) {
+        setTimeout(function() {
+          var errDiv = document.createElement('div');
+          errDiv.style.position = 'fixed';
+          errDiv.style.top = '0';
+          errDiv.style.left = '0';
+          errDiv.style.width = '100%';
+          errDiv.style.backgroundColor = '#ff4d4d';
+          errDiv.style.color = '#fff';
+          errDiv.style.padding = '24px';
+          errDiv.style.zIndex = '999999';
+          errDiv.style.fontFamily = 'monospace';
+          errDiv.style.fontSize = '14px';
+          errDiv.style.lineHeight = '1.6';
+          errDiv.style.whiteSpace = 'pre-wrap';
+          errDiv.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)';
+          errDiv.innerHTML = '<h3 style="margin: 0 0 10px 0;">🚨 ELIXYR ATELIER RUNTIME ERROR:</h3>' + 
+            '<strong>Error Message:</strong> ' + e.message + '<br>' +
+            '<strong>Source File:</strong> ' + e.filename + '<br>' +
+            '<strong>Line/Col:</strong> ' + e.lineno + ':' + e.colno + '<br><br>' +
+            '<strong>Trace Stack:</strong><br>' + (e.error ? e.error.stack : 'No stack trace available');
+          document.body.appendChild(errDiv);
+        }, 100);
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        setTimeout(function() {
+          var errDiv = document.createElement('div');
+          errDiv.style.position = 'fixed';
+          errDiv.style.top = '0';
+          errDiv.style.left = '0';
+          errDiv.style.width = '100%';
+          errDiv.style.backgroundColor = '#ff944d';
+          errDiv.style.color = '#fff';
+          errDiv.style.padding = '24px';
+          errDiv.style.zIndex = '999999';
+          errDiv.style.fontFamily = 'monospace';
+          errDiv.style.fontSize = '14px';
+          errDiv.style.lineHeight = '1.6';
+          errDiv.style.whiteSpace = 'pre-wrap';
+          errDiv.style.boxShadow = '0 6px 20px rgba(0,0,0,0.4)';
+          errDiv.innerHTML = '<h3 style="margin: 0 0 10px 0;">⚠️ UNHANDLED REJECTION IN PROMISE:</h3>' + 
+            '<strong>Reason:</strong> ' + e.reason + '<br><br>' +
+            '<strong>Trace Stack:</strong><br>' + (e.reason && e.reason.stack ? e.reason.stack : 'No stack trace available');
+          document.body.appendChild(errDiv);
+        }, 100);
+      });
+    </script>
+    
+    <!-- Open Graph / Social Cards -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ELIXYR — Luxury Perfume House | Dubai" />
+    <meta property="og:description" content="Experience premium signature extracts from the Emirates. Saffron, Smoked Oud, and warm Ambergris." />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1547887537-6158d64c35b3?auto=format&fit=crop&q=80&w=1200" />
+    
+    <!-- Google Barcode Font for Skeuomorphic Receipt -->
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+39&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
