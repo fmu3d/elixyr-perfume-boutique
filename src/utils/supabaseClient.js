@@ -7,7 +7,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 // Determine if we have valid-looking Supabase configuration
 const isConfigured = supabaseUrl && supabaseAnonKey && 
                     !supabaseUrl.includes('your-project-id') && 
-                    !supabaseAnonKey.includes('eyJhbGciOi');
+                    !supabaseAnonKey.includes('your-anon-key');
 
 export let supabase = null;
 
