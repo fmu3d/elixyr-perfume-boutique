@@ -274,6 +274,14 @@ function App() {
         setCurrentRoute('/payment-soon');
       } else if (path === '/cod-soon') {
         setCurrentRoute('/cod-soon');
+      } else if (path === '/privacy') {
+        setCurrentRoute('/privacy');
+        setScopedProductSlug(null);
+        setScopedBlogSlug(null);
+      } else if (path === '/terms') {
+        setCurrentRoute('/terms');
+        setScopedProductSlug(null);
+        setScopedBlogSlug(null);
       } else {
         // Check for specific sub-paths like /creed or /creed/admin-portal
         const cleanPath = path.substring(1); // Remove leading slash
@@ -1106,7 +1114,7 @@ function App() {
 
                   <div style={{marginTop: '20px', textAlign: 'center'}}>
                     <button 
-                      onClick={() => { setScopedProductSlug('bespoke-oud-reserve'); navigateTo('/product-detail'); }} 
+                      onClick={() => navigateTo('/bespoke-oud-reserve')} 
                       className="btn btn-primary"
                       style={{padding: '12px 24px', fontSize: '0.7rem', width: '100%', border: '1px solid var(--accent-gold)', letterSpacing: '2px', fontWeight: '600'}}
                     >
@@ -2366,6 +2374,100 @@ function App() {
               </button>
               <button className="btn btn-secondary" onClick={() => navigateTo('/')}>
                 Return to Shop
+              </button>
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* ROUTE: PRIVACY POLICY VIEW ('/privacy') */}
+      {currentRoute === '/privacy' && (
+        <main className="container" style={{padding: 'var(--space-2xl) 0', maxWidth: '800px'}}>
+          <div style={{textAlign: 'left', marginTop: '40px'}}>
+            <span className="section-category">LEGAL PORTAL</span>
+            <h1 className="font-serif" style={{fontSize: '3rem', marginBottom: '24px', fontWeight: '300'}}>Privacy Policy</h1>
+            <p style={{color: 'var(--accent-gold)', textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.75rem', fontWeight: '600', marginBottom: '40px'}}>Last Updated: May 2026</p>
+            
+            <div style={{color: 'var(--text-secondary)', lineHeight: '1.8', display: 'flex', flexDirection: 'column', gap: '30px', fontSize: '0.85rem'}}>
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>1. Collection of Information</h4>
+                <p>
+                  At Elixyr, we respect your absolute right to privacy. We only collect standard checkout details (your Full Name, WhatsApp phone number, email address, and Emirate of delivery) to fulfill your bespoke fragrance orders and contact you via our secure delivery concierge.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>2. Data Security & Storage</h4>
+                <p>
+                  Your boutique order details are logged using enterprise-grade, encrypted cloud databases (Supabase). We employ strict Row Level Security (RLS) protocols to ensure that order history is fully protected and accessible only by authorized boutique dispatch personnel.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>3. WhatsApp & Concierge Communications</h4>
+                <p>
+                  By completing a checkout slip, you consent to our boutique representatives contacting you via WhatsApp or phone solely to coordinate high-priority shipping updates, COD card collection, or delivery windows. We never sell, lease, or distribute your phone number to third-party marketers.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>4. Cookies & Analytics</h4>
+                <p>
+                  We use cookies and light browser storage components solely to save your local shopping bag quantities, checkout form values, and custom theme configurations (light/dark mode toggle) to elevate your digital experience.
+                </p>
+              </section>
+            </div>
+
+            <div style={{marginTop: '50px'}}>
+              <button className="btn btn-secondary" onClick={() => navigateTo('/')} style={{padding: '12px 30px', fontSize: '0.7rem', letterSpacing: '2px'}}>
+                RETURN TO SHOP
+              </button>
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* ROUTE: TERMS OF SERVICE VIEW ('/terms') */}
+      {currentRoute === '/terms' && (
+        <main className="container" style={{padding: 'var(--space-2xl) 0', maxWidth: '800px'}}>
+          <div style={{textAlign: 'left', marginTop: '40px'}}>
+            <span className="section-category">LEGAL PORTAL</span>
+            <h1 className="font-serif" style={{fontSize: '3rem', marginBottom: '24px', fontWeight: '300'}}>Terms of Service</h1>
+            <p style={{color: 'var(--accent-gold)', textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.75rem', fontWeight: '600', marginBottom: '40px'}}>Last Updated: May 2026</p>
+            
+            <div style={{color: 'var(--text-secondary)', lineHeight: '1.8', display: 'flex', flexDirection: 'column', gap: '30px', fontSize: '0.85rem'}}>
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>1. Small-Batch Craftsmanship</h4>
+                <p>
+                  Elixyr fragrances are curated, blended, and hand-assembled in small batches using premium raw materials and high concentrations of organic agarwood and ingredients. Because of this natural extraction method, subtle variations in color, bottle weight, and raw notes are normal and serve as a certificate of small-batch authenticity.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>2. Order Fulfillments & Delivery</h4>
+                <p>
+                  Orders placed through our digital concierge are passed to our regional courier partners. Delivery times and shipping fees (ranging from 15 AED in Dubai/Sharjah to 25 AED in Fujairah/RAK) are estimates. Hand-offs are conducted securely by our professional courier staff.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>3. Cash on Delivery (COD) Transactions</h4>
+                <p>
+                  For COD checkout routes, you agree to collect the order and pay the full invoice amount at the designated delivery address. Failure to pay or receive pre-arranged shipments may result in a suspension of boutique ordering slots for future launches.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>4. Customer Satisfaction & Returns</h4>
+                <p>
+                  Due to the hygienic nature of luxury extraits, opened items cannot be returned. We highly recommend adding one of our Discovery Set samplers to your cart to experience our collections before opening full bottles.
+                </p>
+              </section>
+            </div>
+
+            <div style={{marginTop: '50px'}}>
+              <button className="btn btn-secondary" onClick={() => navigateTo('/')} style={{padding: '12px 30px', fontSize: '0.7rem', letterSpacing: '2px'}}>
+                RETURN TO SHOP
               </button>
             </div>
           </div>
@@ -4594,10 +4696,9 @@ function App() {
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Boutique</h5>
+              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Atelier</h5>
               <p style={{ color: 'var(--text-tertiary)', lineHeight: '1.8', fontSize: '0.75rem', margin: 0 }}>
-                Monday – Sunday: 10:00 AM – 10:00 PM GST<br />
-                Downtown Dubai, United Arab Emirates
+                An independent olfactory workshop dedicated to rare extraits and high-concentration agarwood blends. Online boutique exclusive.
               </p>
             </div>
           </div>
@@ -4615,8 +4716,8 @@ function App() {
           }}>
             <span>© {new Date().getFullYear()} ELIXYR PERFUME BOUTIQUE. ALL RIGHTS RESERVED.</span>
             <div style={{ display: 'flex', gap: '20px' }}>
-              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy Policy</a>
-              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Terms of Service</a>
+              <button onClick={() => navigateTo('/privacy')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 'inherit', padding: 0 }}>Privacy Policy</button>
+              <button onClick={() => navigateTo('/terms')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 'inherit', padding: 0 }}>Terms of Service</button>
             </div>
           </div>
         </footer>
