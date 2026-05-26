@@ -1000,36 +1000,36 @@ function App() {
             </button>
           </div>
         </div>
-
-        {/* Sliding Mobile Navigation Menu Overlay */}
-        {isMobileMenuOpen && (
-          <div className="mobile-menu-drawer" onClick={() => setIsMobileMenuOpen(false)}>
-            <div className="mobile-menu-drawer-content" onClick={e => e.stopPropagation()}>
-              <button className="close-btn" onClick={() => setIsMobileMenuOpen(false)} style={{top: '20px', right: '20px', background: 'none', border: 'none', cursor: 'pointer'}}>×</button>
-              <ul className="mobile-nav-links" style={{marginTop: '40px'}}>
-                <li>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); }} className="mobile-nav-link">Home</button>
-                </li>
-                <li>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} className="mobile-nav-link">Shop</button>
-                </li>
-                <li>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); setTimeout(() => document.getElementById('discovery')?.scrollIntoView({behavior:'smooth'}), 100); }} className="mobile-nav-link">Gifting</button>
-                </li>
-                <li>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/journal'); }} className="mobile-nav-link">Journal</button>
-                </li>
-                <li>
-                  <button onClick={() => { setIsMobileMenuOpen(false); setIsQuizOpen(true); resetQuiz(); }} className="mobile-nav-link" style={{color: 'var(--accent-gold)'}}>Scent Finder</button>
-                </li>
-                <li>
-                  <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/wanna-see-hows-your-order-doing'); }} className="mobile-nav-link">Track Order</button>
-                </li>
-              </ul>
-            </div>
-          </div>
-        )}
       </header>
+
+      {/* Sliding Mobile Navigation Menu Overlay (Moved outside header to prevent backdrop-filter containing block constraint) */}
+      {isMobileMenuOpen && (
+        <div className="mobile-menu-drawer" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="mobile-menu-drawer-content" onClick={e => e.stopPropagation()}>
+            <button className="close-btn" onClick={() => setIsMobileMenuOpen(false)} style={{top: '20px', right: '20px', background: 'none', border: 'none', cursor: 'pointer'}}>×</button>
+            <ul className="mobile-nav-links" style={{marginTop: '40px'}}>
+              <li>
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); }} className="mobile-nav-link">Home</button>
+              </li>
+              <li>
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} className="mobile-nav-link">Shop</button>
+              </li>
+              <li>
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); setTimeout(() => document.getElementById('discovery')?.scrollIntoView({behavior:'smooth'}), 100); }} className="mobile-nav-link">Gifting</button>
+              </li>
+              <li>
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/journal'); }} className="mobile-nav-link">Journal</button>
+              </li>
+              <li>
+                <button onClick={() => { setIsMobileMenuOpen(false); setIsQuizOpen(true); resetQuiz(); }} className="mobile-nav-link" style={{color: 'var(--accent-gold)'}}>Scent Finder</button>
+              </li>
+              <li>
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/wanna-see-hows-your-order-doing'); }} className="mobile-nav-link">Track Order</button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* --- DYNAMIC ROUTER SWEEP --- */}
 
@@ -4547,6 +4547,79 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 5. BRAND PREMIUM BLACK FOOTER (Client-facing routes only) */}
+      {currentRoute !== '/admin-portal' && (
+        <footer className="boutique-footer" style={{
+          backgroundColor: '#0A0A0A',
+          color: '#E5D5B3',
+          padding: '60px 0 40px',
+          borderTop: '1px solid rgba(197, 168, 128, 0.15)',
+          fontSize: '0.8rem',
+          fontFamily: 'var(--font-sans)',
+          letterSpacing: '0.05em',
+          marginTop: '60px'
+        }}>
+          <div className="container" style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '40px',
+            marginBottom: '40px',
+            textAlign: 'left'
+          }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <span className="font-serif" style={{ fontSize: '1.8rem', color: '#F5F2EA', letterSpacing: '2px', fontWeight: '300' }}>ELIXYR</span>
+              <p style={{ color: 'var(--text-tertiary)', lineHeight: '1.8', fontSize: '0.75rem', margin: 0 }}>
+                Curators of rare extraits and majestic oud blends, hand-poured in small batches in Dubai, UAE.
+              </p>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Collections</h5>
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', padding: 0, margin: 0 }}>
+                <li><button onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Oud Blends</button></li>
+                <li><button onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Signature Extraits</button></li>
+                <li><button onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('discovery')?.scrollIntoView({behavior:'smooth'}), 100); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Discovery Sets</button></li>
+              </ul>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Customer Service</h5>
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', padding: 0, margin: 0 }}>
+                <li><button onClick={() => navigateTo('/wanna-see-hows-your-order-doing')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Track Order</button></li>
+                <li><button onClick={() => { setIsQuizOpen(true); resetQuiz(); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Scent Quiz</button></li>
+                <li><a href="https://wa.me/971501234567" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-tertiary)', textDecoration: 'none', fontSize: '0.75rem' }}>WhatsApp Concierge</a></li>
+              </ul>
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Boutique</h5>
+              <p style={{ color: 'var(--text-tertiary)', lineHeight: '1.8', fontSize: '0.75rem', margin: 0 }}>
+                Monday – Sunday: 10:00 AM – 10:00 PM GST<br />
+                Downtown Dubai, United Arab Emirates
+              </p>
+            </div>
+          </div>
+          
+          <div className="container" style={{
+            borderTop: '1px solid rgba(197, 168, 128, 0.08)',
+            paddingTop: '30px',
+            display: 'flex',
+            justify-content: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '20px',
+            color: 'var(--text-tertiary)',
+            fontSize: '0.7rem'
+          }}>
+            <span>© {new Date().getFullYear()} ELIXYR PERFUME BOUTIQUE. ALL RIGHTS RESERVED.</span>
+            <div style={{ display: 'flex', gap: '20px' }}>
+              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy Policy</a>
+              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Terms of Service</a>
+            </div>
+          </div>
+        </footer>
       )}
 
     </div>
