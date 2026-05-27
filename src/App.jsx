@@ -93,6 +93,32 @@ function App() {
 
   // --- Router & History State ---
   const [currentRoute, setCurrentRoute] = useState('/');
+  const [perfumeSearchQuery, setPerfumeSearchQuery] = useState('');
+  const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  // Dynamic autocompletion matching algorithm for store searches
+  const getSuggestions = () => {
+    const query = perfumeSearchQuery.trim().toLowerCase();
+    if (!query) return [];
+    return products.filter(p => 
+      p.name.toLowerCase().includes(query) || 
+      p.scent_family.toLowerCase().includes(query) ||
+      (p.key_notes && p.key_notes.some(note => note.toLowerCase().includes(query)))
+    ).slice(0, 5); // Curate top 5 recommendations for clean dropdown presentation
+  };
+
+  // Autocomplete outside click dismisser side-effect
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.search-bar-wrapper')) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, []);
+
   const [scopedProductSlug, setScopedProductSlug] = useState(null);
   const [scopedBlogSlug, setScopedBlogSlug] = useState(null);
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -130,6 +156,41 @@ function App() {
   const [editingStatusKey, setEditingStatusKey] = useState(null);
   const [editingStatusLabel, setEditingStatusLabel] = useState('');
   const [checkoutError, setCheckoutError] = useState(null);
+
+  // Real-time canvas background-free transparentizer for search empty-state chibi avatar
+  const [transparentChibiUrl, setTransparentChibiUrl] = useState('');
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/chibi_arab_perfumer.png';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      try {
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i+1];
+          const b = data[i+2];
+          // Strip white pixels dynamically to make the chibi background-free on dark & light themes
+          if (r > 240 && g > 240 && b > 240) {
+            data[i+3] = 0;
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        setTransparentChibiUrl(canvas.toDataURL('image/png'));
+      } catch (e) {
+        console.error("Canvas transparent-keying failed:", e);
+        setTransparentChibiUrl('/chibi_arab_perfumer.png');
+      }
+    };
+    img.onerror = () => {
+      setTransparentChibiUrl('/chibi_arab_perfumer.png');
+    };
+  }, []);
 
   // --- Dynamic Products, Blogs, & Orders State (Supabase / Local fallback synced) ---
   const [products, setProducts] = useState(() => {
@@ -1149,8 +1210,13 @@ function App() {
 
   // Catalog Filtration
   const filteredProducts = products.filter(p => {
-    if (activeCategory === 'ALL FRAGRANCES') return true;
-    return p.category === activeCategory;
+    const matchesCategory = activeCategory === 'ALL FRAGRANCES' || p.category === activeCategory;
+    const matchesSearch = !submittedSearchQuery || 
+      p.name.toLowerCase().includes(submittedSearchQuery.toLowerCase()) || 
+      p.scent_family.toLowerCase().includes(submittedSearchQuery.toLowerCase()) || 
+      (p.key_notes && p.key_notes.some(note => note.toLowerCase().includes(submittedSearchQuery.toLowerCase()))) ||
+      (p.description && p.description.toLowerCase().includes(submittedSearchQuery.toLowerCase()));
+    return matchesCategory && matchesSearch;
   });
 
   const lowStockCount = products.filter(p => p.stock_status === 'low_stock').length;
@@ -1281,6 +1347,62 @@ function App() {
           </nav>
 
           <div className="header-actions">
+            {/* Luxe Boutique Search Bar */}
+            <div className="search-bar-wrapper">
+              <input 
+                type="text" 
+                placeholder="Search collection..."
+                value={perfumeSearchQuery}
+                onChange={(e) => {
+                  setPerfumeSearchQuery(e.target.value);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setActiveCategory('ALL FRAGRANCES'); // Search the whole catalog
+                    setSubmittedSearchQuery(perfumeSearchQuery);
+                    setShowSuggestions(false);
+                    // Smoothly scroll down to show search results
+                    setTimeout(() => {
+                      document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                  }
+                }}
+                className="search-input-header"
+              />
+              <span className="search-icon-btn">🔍</span>
+
+              {/* Autocomplete Search Suggestions Dropdown */}
+              {showSuggestions && perfumeSearchQuery.trim() && (
+                <div className="search-suggestions-dropdown">
+                  {getSuggestions().length > 0 ? (
+                    getSuggestions().map(p => (
+                      <div 
+                        key={p.id} 
+                        className="suggestion-item" 
+                        onClick={() => {
+                          setPerfumeSearchQuery(p.name);
+                          setSubmittedSearchQuery(p.name);
+                          setShowSuggestions(false);
+                          navigateTo(`/${p.slug}`);
+                        }}
+                      >
+                        <img src={p.images[0]} alt={p.name} />
+                        <div className="suggestion-info">
+                          <span className="suggestion-name">{p.name}</span>
+                          <span className="suggestion-family">{p.scent_family}</span>
+                        </div>
+                        <span className="suggestion-price">{p.price} AED</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="suggestion-empty">No matching products found</div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <button className="cart-icon-btn" onClick={() => setIsCartOpen(true)}>
               CART <span className="cart-badge">{cart.reduce((sum, i) => sum + i.qty, 0)}</span>
             </button>
@@ -1462,80 +1584,237 @@ function App() {
                 ))}
               </div>
 
-              <div className="product-grid">
-                {filteredProducts.map(product => (
-                  <article key={product.id} className="product-card">
-                    <div className="product-img-wrapper" style={{cursor: 'pointer'}} onClick={() => navigateTo(`/${product.slug}`)}>
-                      <img src={product.images[0]} alt={product.name} className="product-img" />
-                      {product.scarcity_note && (
-                        <span className="card-scarcity-tag">{product.scarcity_note}</span>
-                      )}
-                      {product.stock_status === 'out_of_stock' && (
-                        <span className="card-scarcity-tag" style={{backgroundColor: '#e74c3c', color: '#fff'}}>OUT OF STOCK</span>
-                      )}
-                    </div>
-                    
-                    <div className="product-info">
-                      <span className="product-scent-family">{product.scent_family}</span>
-                      <h3 className="product-title" style={{cursor: 'pointer'}} onClick={() => navigateTo(`/${product.slug}`)}>
-                        {product.name}
-                      </h3>
-                      <p className="product-notes">{product.key_notes.join(', ')}</p>
+
+              {/* Search Active Indicator */}
+              {submittedSearchQuery && (
+                <div className="search-active-indicator" style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '12px 20px',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: '2px',
+                  marginBottom: '24px',
+                  animation: 'fadeIn 0.4s ease'
+                }}>
+                  <div style={{fontSize: '0.85rem', color: 'var(--text-secondary)'}}>
+                    Showing results for <strong style={{color: 'var(--accent-gold)'}}>{submittedSearchQuery}</strong> 
+                    <span style={{marginLeft: '8px', color: 'var(--text-tertiary)'}}>
+                      ({filteredProducts.length} {filteredProducts.length === 1 ? 'match' : 'matches'} found)
+                    </span>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setPerfumeSearchQuery('');
+                      setSubmittedSearchQuery('');
+                    }}
+                    className="btn btn-secondary"
+                    style={{
+                      padding: '4px 12px',
+                      fontSize: '0.65rem',
+                      minHeight: 'auto',
+                      border: '1px solid var(--accent-gold)',
+                      color: 'var(--accent-gold)',
+                      backgroundColor: 'transparent',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Clear Search ×
+                  </button>
+                </div>
+              )}
+
+              {filteredProducts.length === 0 ? (
+                /* Bespoke Luxury Search Empty State featuring transparent Chibi Arab Perfumer */
+                <div className="search-empty-state" style={{
+                  textAlign: 'center',
+                  padding: '48px 24px',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: '2px',
+                  backgroundColor: 'var(--bg-card)',
+                  maxWidth: '720px',
+                  margin: '0 auto 48px auto',
+                  animation: 'fadeIn 0.5s ease'
+                }}>
+                  <div className="chibi-avatar-wrapper" style={{
+                    width: '180px',
+                    height: '180px',
+                    margin: '0 auto 24px auto',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(212, 175, 55, 0.05)',
+                    border: '1px dashed var(--accent-gold)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    boxShadow: '0 0 30px rgba(212, 175, 55, 0.1)'
+                  }}>
+                    <img 
+                      src={transparentChibiUrl || '/chibi_arab_perfumer.png'} 
+                      alt="Chibi Arab Perfumer" 
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'contain',
+                        transform: 'scale(1.05)'
+                      }}
+                    />
+                  </div>
+                  <h3 className="font-serif" style={{
+                    fontSize: '2rem',
+                    color: 'var(--text-primary)',
+                    marginBottom: '12px',
+                    fontWeight: '300'
+                  }}>
+                    No Olfactory Matches Found
+                  </h3>
+                  <p style={{
+                    fontSize: '0.9rem',
+                    color: 'var(--text-secondary)',
+                    maxWidth: '540px',
+                    margin: '0 auto 28px auto',
+                    lineHeight: '1.6'
+                  }}>
+                    Currently, we do not have <strong style={{color: 'var(--accent-gold)'}}>"{submittedSearchQuery}"</strong> in our catalog. However, the house of Elixyr excels in crafting signature personal extraits and bespoke formulas. You may request a custom formulation by contacting our master blenders directly.
+                  </p>
+                  <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    gap: '16px'
+                  }}>
+                    <a 
+                      href={`https://wa.me/971521234567?text=Hello%20Elixyr,%20I%20searched%20for%20"${encodeURIComponent(submittedSearchQuery)}"%20but%20could%20not%20find%20it.%20Can%20I%20request%20a%20custom%20blending?`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-primary"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 24px',
+                        fontSize: '0.75rem',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      💬 WhatsApp Request (+971 52 123 4567)
+                    </a>
+                    <a 
+                      href={`mailto:contact@elixyr.ae?subject=Bespoke%20Fragrance%20Request:%20${encodeURIComponent(submittedSearchQuery)}&body=Hello%20Elixyr%20Blenders,%0A%0AI%20would%20like%20to%20request%20a%20custom%20formulation%20of%20a%20perfume%20featuring%20these%20notes...`}
+                      className="btn btn-secondary"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 24px',
+                        fontSize: '0.75rem',
+                        border: '1px solid var(--accent-gold)',
+                        color: 'var(--accent-gold)',
+                        backgroundColor: 'transparent',
+                        textDecoration: 'none'
+                      }}
+                    >
+                      ✉️ Email Request (contact@elixyr.ae)
+                    </a>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setPerfumeSearchQuery('');
+                      setSubmittedSearchQuery('');
+                    }}
+                    style={{
+                      marginTop: '32px',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-tertiary)',
+                      textDecoration: 'underline',
+                      fontSize: '0.8rem',
+                      cursor: 'pointer'
+                    }}
+                    onMouseEnter={e => e.target.style.color = 'var(--accent-gold)'}
+                    onMouseLeave={e => e.target.style.color = ''}
+                  >
+                    Reset Scent Search & Browse Catalog
+                  </button>
+                </div>
+              ) : (
+                <div className="product-grid">
+                  {filteredProducts.map(product => (
+                    <article key={product.id} className="product-card">
+                      <div className="product-img-wrapper" style={{cursor: 'pointer'}} onClick={() => navigateTo(`/${product.slug}`)}>
+                        <img src={product.images[0]} alt={product.name} className="product-img" />
+                        {product.scarcity_note && (
+                          <span className="card-scarcity-tag">{product.scarcity_note}</span>
+                        )}
+                        {product.stock_status === 'out_of_stock' && (
+                          <span className="card-scarcity-tag" style={{backgroundColor: '#e74c3c', color: '#fff'}}>OUT OF STOCK</span>
+                        )}
+                      </div>
                       
-                      {/* Scent sliders gauges */}
-                      <div className="scent-gauges-container">
-                        <div className="scent-gauge-row">
-                          <span className="gauge-label">Sillage</span>
-                          <div className="gauge-bar-bg">
-                            <div className="gauge-bar-fill" style={{width: `${product.sillage || 70}%`}}></div>
+                      <div className="product-info">
+                        <span className="product-scent-family">{product.scent_family}</span>
+                        <h3 className="product-title" style={{cursor: 'pointer'}} onClick={() => navigateTo(`/${product.slug}`)}>
+                          {product.name}
+                        </h3>
+                        <p className="product-notes">{product.key_notes.join(', ')}</p>
+                        
+                        {/* Scent sliders gauges */}
+                        <div className="scent-gauges-container">
+                          <div className="scent-gauge-row">
+                            <span className="gauge-label">Sillage</span>
+                            <div className="gauge-bar-bg">
+                              <div className="gauge-bar-fill" style={{width: `${product.sillage || 70}%`}}></div>
+                            </div>
+                            <span className="gauge-value-desc">
+                              {product.sillage > 80 ? 'Powerful' : product.sillage > 50 ? 'Strong' : 'Intimate'}
+                            </span>
                           </div>
-                          <span className="gauge-value-desc">
-                            {product.sillage > 80 ? 'Powerful' : product.sillage > 50 ? 'Strong' : 'Intimate'}
-                          </span>
+
+                          <div className="scent-gauge-row">
+                            <span className="gauge-label">Longevity</span>
+                            <div className="gauge-bar-bg">
+                              <div className="gauge-bar-fill" style={{width: `${product.longevity || 75}%`}}></div>
+                            </div>
+                            <span className="gauge-value-desc">
+                              {product.longevity > 85 ? 'Infinite' : product.longevity > 60 ? 'Long' : 'Moderate'}
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="scent-gauge-row">
-                          <span className="gauge-label">Longevity</span>
-                          <div className="gauge-bar-bg">
-                            <div className="gauge-bar-fill" style={{width: `${product.longevity || 75}%`}}></div>
+                        <div className="product-footer">
+                          <span className="product-price">{product.price} AED</span>
+                          <div className="product-actions-btn-group">
+                            <button 
+                              className="btn btn-secondary btn-card-action"
+                              onClick={() => navigateTo(`/${product.slug}`)}
+                            >
+                              DISCOVER
+                            </button>
+                            <button 
+                              className="btn btn-primary btn-card-action"
+                              disabled={product.stock_status === 'out_of_stock'}
+                              onClick={() => addToCart(product)}
+                              style={{
+                                backgroundColor: recentlyAddedId === product.id ? 'var(--accent-gold-light)' : '',
+                                color: recentlyAddedId === product.id ? 'var(--accent-gold)' : '',
+                                borderColor: recentlyAddedId === product.id ? 'var(--accent-gold)' : ''
+                              }}
+                            >
+                              {product.stock_status === 'out_of_stock' 
+                                ? 'OUT' 
+                                : recentlyAddedId === product.id 
+                                  ? 'ADDED!' 
+                                  : 'ADD'}
+                            </button>
                           </div>
-                          <span className="gauge-value-desc">
-                            {product.longevity > 85 ? 'Infinite' : product.longevity > 60 ? 'Long' : 'Moderate'}
-                          </span>
                         </div>
                       </div>
-
-                      <div className="product-footer">
-                        <span className="product-price">{product.price} AED</span>
-                        <div className="product-actions-btn-group">
-                          <button 
-                            className="btn btn-secondary btn-card-action"
-                            onClick={() => navigateTo(`/${product.slug}`)}
-                          >
-                            DISCOVER
-                          </button>
-                          <button 
-                            className="btn btn-primary btn-card-action"
-                            disabled={product.stock_status === 'out_of_stock'}
-                            onClick={() => addToCart(product)}
-                            style={{
-                              backgroundColor: recentlyAddedId === product.id ? 'var(--accent-gold-light)' : '',
-                              color: recentlyAddedId === product.id ? 'var(--accent-gold)' : '',
-                              borderColor: recentlyAddedId === product.id ? 'var(--accent-gold)' : ''
-                            }}
-                          >
-                            {product.stock_status === 'out_of_stock' 
-                              ? 'OUT' 
-                              : recentlyAddedId === product.id 
-                                ? 'ADDED!' 
-                                : 'ADD'}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
@@ -2060,6 +2339,27 @@ function App() {
                   }}
                 >
                   <div>
+                    {blog.image_url && (
+                      <div className="blog-card-thumbnail-wrapper" style={{
+                        aspectRatio: '16/10',
+                        borderRadius: '2px',
+                        overflow: 'hidden',
+                        marginBottom: '18px',
+                        border: '1px solid var(--border-primary)'
+                      }}>
+                        <img 
+                          src={blog.image_url} 
+                          alt={blog.title} 
+                          className="blog-card-thumbnail"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            transition: 'transform 0.6s cubic-bezier(0.25, 1, 0.5, 1)'
+                          }}
+                        />
+                      </div>
+                    )}
                     <span className="blog-meta" style={{fontSize: '0.65rem', fontWeight: '700', color: 'var(--accent-gold)', letterSpacing: '1px', textTransform: 'uppercase'}}>{blog.category}</span>
                     <h3 className="font-serif" style={{fontSize: '1.5rem', marginTop: '8px', marginBottom: '12px', fontWeight: '300', lineHeight: '1.3'}}>{blog.title}</h3>
                     <p className="blog-excerpt" style={{fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px'}}>{blog.excerpt}</p>
@@ -3560,6 +3860,7 @@ function App() {
                       <table className="admin-table">
                         <thead>
                           <tr>
+                            <th>Cover</th>
                             <th>Category</th>
                             <th>Article Title</th>
                             <th>Teaser Summary</th>
@@ -3569,6 +3870,23 @@ function App() {
                         <tbody>
                           {blogs.map(b => (
                             <tr key={b.id}>
+                              <td>
+                                {b.image_url ? (
+                                  <img 
+                                    src={b.image_url} 
+                                    alt={b.title} 
+                                    style={{
+                                      width: '60px',
+                                      height: '38px',
+                                      objectFit: 'cover',
+                                      borderRadius: '2px',
+                                      border: '1px solid var(--border-primary)'
+                                    }}
+                                  />
+                                ) : (
+                                  <span style={{fontSize: '0.65rem', color: 'var(--text-tertiary)'}}>No Cover</span>
+                                )}
+                              </td>
                               <td style={{color: 'var(--accent-gold)', fontWeight: '600', fontSize: '0.7rem', letterSpacing: '0.5px'}}>{b.category}</td>
                               <td style={{fontWeight: '600', color: 'var(--text-primary)'}}>{b.title}</td>
                               <td style={{color: 'var(--text-tertiary)', fontSize: '0.75rem'}}>{b.excerpt}</td>
