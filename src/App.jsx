@@ -165,6 +165,7 @@ function App() {
   const [crmSearchQuery, setCrmSearchQuery] = useState('');
   const [activeCrmClient, setActiveCrmClient] = useState(null);
   const [newVipTag, setNewVipTag] = useState('');
+  const [editingCrmClient, setEditingCrmClient] = useState(null);
 
   useEffect(() => {
     setActiveImageIdx(0);
@@ -595,7 +596,7 @@ function App() {
     }
   };
 
-  // Compile unique VIP customer profiles from current orders registry
+  // Compile unique customer profiles from current orders registry for CRM Data
   const compileClientProfiles = () => {
     const clientsMap = {};
     
@@ -605,11 +606,9 @@ function App() {
       const key = `${o.client_name.toLowerCase().trim()}_${cleanPhone.replace(/\+/g, '')}`;
       
       // Calculate order total value (amount)
-      let amount = parseFloat(o.total_amount) || 0;
+      let amount = parseFloat(o.total_amount || o.total) || 0;
       
-      // Determine scent families purchased
       const itemsList = Array.isArray(o.items) ? o.items : [];
-      const purchasedProductIds = itemsList.map(i => i.id);
       
       if (!clientsMap[key]) {
         clientsMap[key] = {
@@ -619,8 +618,8 @@ function App() {
           totalSpent: 0,
           ordersCount: 0,
           ordersList: [],
-          purchasedIds: [],
-          lastActive: o.created_at || new Date().toISOString(),
+          perfumeCounts: {},
+          lastActive: o.created_at || o.date || new Date().toISOString(),
           id: key
         };
       }
@@ -628,73 +627,161 @@ function App() {
       clientsMap[key].totalSpent += amount;
       clientsMap[key].ordersCount += 1;
       clientsMap[key].ordersList.push(o);
-      clientsMap[key].purchasedIds.push(...purchasedProductIds);
       
-      if (new Date(o.created_at || 0) > new Date(clientsMap[key].lastActive)) {
-        clientsMap[key].lastActive = o.created_at;
+      itemsList.forEach(item => {
+        if (item.name) {
+          clientsMap[key].perfumeCounts[item.name] = (clientsMap[key].perfumeCounts[item.name] || 0) + (parseInt(item.qty) || 1);
+        }
+      });
+      
+      const oDate = o.created_at || o.date || 0;
+      if (new Date(oDate) > new Date(clientsMap[key].lastActive)) {
+        clientsMap[key].lastActive = oDate;
       }
     });
 
-    // Map profiles and append their metadata (Staff notes and VIP Tags) from localized state
+    // Map profiles and append their metadata (gender, private staff notes etc) from localized state
     return Object.values(clientsMap).map(c => {
       // Find matching metadata from local storage / memory state
       const meta = crmMetadata[c.phone] || crmMetadata[c.name] || {};
       
-      // Preferred Category analysis
-      let favoriteCategory = 'None Yet';
-      if (c.purchasedIds.length > 0) {
-        // Count categories
-        const catCounts = {};
-        c.purchasedIds.forEach(id => {
-          const prod = products.find(p => p.id === id);
-          if (prod) {
-            catCounts[prod.category] = (catCounts[prod.category] || 0) + 1;
-          }
-        });
-        // Find top category
-        let max = 0;
-        Object.entries(catCounts).forEach(([cat, count]) => {
-          if (count > max) {
-            max = count;
-            favoriteCategory = cat;
-          }
-        });
-      }
+      // Gender preference (Unisex / Woman / Men)
+      const gender = meta.gender || 'Unisex';
 
-      // Spend tier status
-      let membership = 'BRONZE DISCOVERER';
-      if (c.totalSpent >= 1000) {
-        membership = 'PLATINUM VIP CONNOISSEUR';
-      } else if (c.totalSpent >= 500) {
-        membership = 'GOLD ELITE MEMBER';
-      } else if (c.totalSpent >= 250) {
-        membership = 'SILVER VIP MEMBER';
-      }
+      // Favorite Perfume (most recurring buying perfume)
+      let favoritePerfume = 'None Yet';
+      let maxCount = 0;
+      Object.entries(c.perfumeCounts).forEach(([name, count]) => {
+        if (count > maxCount) {
+          maxCount = count;
+          favoritePerfume = name;
+        }
+      });
+
+      // Comma-separated list of perfumes bought with quantities
+      const perfumesBought = Object.entries(c.perfumeCounts)
+        .map(([name, count]) => `${count}x ${name}`)
+        .join(', ') || 'None Yet';
 
       return {
         ...c,
+        gender,
+        favoritePerfume,
+        perfumesBought,
         staffNotes: meta.staffNotes || '',
-        vipTags: meta.vipTags || [],
-        favoriteCategory,
-        membership
+        vipTags: meta.vipTags || []
       };
     });
   };
 
-  const handleSaveCrmMetadata = (phoneKey, updatedNotes, updatedTags) => {
+  const handleSaveCrmMetadata = (phoneKey, updatedNotes, updatedTags, updatedGender) => {
+    const current = crmMetadata[phoneKey] || {};
     const updated = {
       ...crmMetadata,
       [phoneKey]: {
-        staffNotes: updatedNotes,
-        vipTags: updatedTags
+        ...current,
+        staffNotes: updatedNotes !== undefined ? updatedNotes : (current.staffNotes || ''),
+        vipTags: updatedTags !== undefined ? updatedTags : (current.vipTags || []),
+        gender: updatedGender !== undefined ? updatedGender : (current.gender || 'Unisex')
       }
     };
     setCrmMetadata(updated);
     localStorage.setItem('elixyr_crm_metadata_v2', JSON.stringify(updated));
     
     // Show premium visual feedback
-    setSyncNotification({ type: 'success', message: '⚜️ VIP CRM profile saved locally & queued for Supabase sync.' });
+    setSyncNotification({ type: 'success', message: '⚜️ CRM profile metadata updated.' });
     setTimeout(() => setSyncNotification(null), 3000);
+  };
+
+  const handleSaveCrmClientEdits = async (originalPhone, originalName, newName, newPhone, newEmail, newGender) => {
+    try {
+      // 1. Update the client metadata (notes, tags, gender)
+      const currentMeta = crmMetadata[originalPhone] || crmMetadata[originalName] || {};
+      const updatedMeta = { ...crmMetadata };
+      
+      // Clean up old key if phone changed
+      if (originalPhone !== newPhone) {
+        delete updatedMeta[originalPhone];
+      }
+      
+      updatedMeta[newPhone] = {
+        ...currentMeta,
+        gender: newGender
+      };
+      
+      setCrmMetadata(updatedMeta);
+      localStorage.setItem('elixyr_crm_metadata_v2', JSON.stringify(updatedMeta));
+
+      // 2. Find all orders belonging to this client (by matching phone or name) and update them
+      const updatedOrders = await Promise.all(orders.map(async (o) => {
+        const matches = sanitizeUAEPhone(o.phone) === originalPhone || o.client_name === originalName;
+        if (matches) {
+          const updatedRecord = {
+            ...o,
+            client_name: newName,
+            clientName: newName,
+            phone: newPhone,
+            email: newEmail
+          };
+          
+          // Save in Supabase & LocalStorage
+          await database.updateOrder(o.id, {
+            client_name: newName,
+            phone: newPhone,
+            email: newEmail
+          });
+          
+          return updatedRecord;
+        }
+        return o;
+      }));
+
+      setOrders(updatedOrders);
+      setEditingCrmClient(null);
+      
+      setSyncNotification({ type: 'success', message: `⚜️ Customer "${newName}" profile updated successfully.` });
+      setTimeout(() => setSyncNotification(null), 3000);
+    } catch (err) {
+      console.error("Failed to save CRM client edits:", err);
+      alert("Error occurred while saving customer profile updates.");
+    }
+  };
+
+  const handleDeleteCrmClient = async (client) => {
+    if (confirm(`Are you sure you want to permanently delete the customer "${client.name}" and all of their order history from the boutique database? This action is irreversible.`)) {
+      try {
+        // Find all orders belonging to this client (by matching phone or name)
+        const ordersToDelete = orders.filter(o => {
+          return sanitizeUAEPhone(o.phone) === client.phone || o.client_name === client.name;
+        });
+
+        // Delete orders in Supabase & LocalStorage
+        await Promise.all(ordersToDelete.map(o => database.deleteOrder(o.id)));
+
+        // Remove from local React orders state
+        const remainingOrders = orders.filter(o => {
+          return sanitizeUAEPhone(o.phone) !== client.phone && o.client_name !== client.name;
+        });
+        setOrders(remainingOrders);
+
+        // Delete metadata
+        const updatedMeta = { ...crmMetadata };
+        delete updatedMeta[client.phone];
+        delete updatedMeta[client.name];
+        setCrmMetadata(updatedMeta);
+        localStorage.setItem('elixyr_crm_metadata_v2', JSON.stringify(updatedMeta));
+
+        if (activeCrmClient && (activeCrmClient.phone === client.phone || activeCrmClient.name === client.name)) {
+          setActiveCrmClient(null);
+        }
+
+        setSyncNotification({ type: 'success', message: `⚜️ Customer "${client.name}" and all associated orders deleted.` });
+        setTimeout(() => setSyncNotification(null), 3000);
+      } catch (err) {
+        console.error("Failed to delete customer profile:", err);
+        alert("Error occurred while deleting customer profile.");
+      }
+    }
   };
 
   const handleForceSync = async () => {
@@ -2778,7 +2865,7 @@ function App() {
                         className={`sidebar-btn ${adminActiveTab === 'crm' ? 'active' : ''}`}
                         onClick={() => setAdminActiveTab('crm')}
                       >
-                        👥 VIP Client CRM
+                        👥 CRM Data
                       </button>
                     </li>
                   </ul>
@@ -2801,7 +2888,7 @@ function App() {
                     {adminActiveTab === 'blogs' && '✍️ Editorial Journal'}
                     {adminActiveTab === 'categories' && '🏷️ Product Categories Manager'}
                     {adminActiveTab === 'statuses' && '⚙️ Order Fulfillment Statuses'}
-                    {adminActiveTab === 'crm' && '👥 VIP Client CRM & Profiles'}
+                    {adminActiveTab === 'crm' && '👥 CRM Data'}
                   </h2>
                   <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
                     <span className="admin-status-pill" style={{
@@ -3936,43 +4023,31 @@ function App() {
                   </div>
                 )}
 
-                {/* Dashboard Tab 7: VIP CRM */}
+                {/* Dashboard Tab 7: CRM Data */}
                 {adminActiveTab === 'crm' && (
                   <div>
-                    {/* VIP CRM Stats Cards */}
+                    {/* CRM Data Stats Cards */}
                     <div className="admin-stats-row">
                       <div className="admin-stat-card">
-                        <div className="stat-card-label">Unique Clients</div>
+                        <div className="stat-card-label">Total Customers</div>
                         <div className="stat-card-value">
-                          {new Set(orders.map(o => `${o.client_name.toLowerCase().trim()}_${sanitizeUAEPhone(o.phone).replace(/\+/g, '')}`)).size}
+                          {compileClientProfiles().length}
                         </div>
-                        <div className="stat-card-note" style={{color: 'var(--accent-gold)'}}>Active luxury network</div>
+                        <div className="stat-card-note" style={{color: 'var(--accent-gold)'}}>Registered in boutique</div>
                       </div>
                       <div className="admin-stat-card">
-                        <div className="stat-card-label">Platinum VIP Directory</div>
+                        <div className="stat-card-label">Total Customer Revenue</div>
                         <div className="stat-card-value">
-                          {compileClientProfiles().filter(c => c.totalSpent >= 1000).length}
+                          {orders.reduce((sum, o) => sum + (parseFloat(o.total_amount || o.total) || 0), 0).toLocaleString()} AED
                         </div>
-                        <div className="stat-card-note" style={{color: '#2ecc71'}}>LTV Spent &gt;= 1,000 AED</div>
+                        <div className="stat-card-note" style={{color: '#2ecc71'}}>Gross lifetime receipts</div>
                       </div>
                       <div className="admin-stat-card">
-                        <div className="stat-card-label">Repeat Customers</div>
+                        <div className="stat-card-label">Total Customer Orders</div>
                         <div className="stat-card-value">
-                          {compileClientProfiles().filter(c => c.ordersCount > 1).length}
+                          {orders.length}
                         </div>
-                        <div className="stat-card-note" style={{color: '#3498db'}}>High loyalty projection</div>
-                      </div>
-                      <div className="admin-stat-card">
-                        <div className="stat-card-label">Average Client LTV</div>
-                        <div className="stat-card-value">
-                          {(() => {
-                            const profiles = compileClientProfiles();
-                            if (profiles.length === 0) return '0 AED';
-                            const sum = profiles.reduce((acc, curr) => acc + curr.totalSpent, 0);
-                            return `${Math.round(sum / profiles.length)} AED`;
-                          })()}
-                        </div>
-                        <div className="stat-card-note">Client lifetime spend</div>
+                        <div className="stat-card-note" style={{color: '#3498db'}}>Total orders registry count</div>
                       </div>
                     </div>
 
@@ -3982,14 +4057,14 @@ function App() {
                         <input
                           type="text"
                           className="form-input"
-                          placeholder="🔍 Search VIP name, email, or WhatsApp..."
+                          placeholder="🔍 Search name, phone, email, or perfume..."
                           value={crmSearchQuery}
                           onChange={e => setCrmSearchQuery(e.target.value)}
                           style={{fontSize: '0.8rem', padding: '10px 16px', borderRadius: '4px', backgroundColor: 'var(--bg-secondary)', border: '1px solid rgba(255, 255, 255, 0.05)'}}
                         />
                       </div>
                       <span style={{fontSize: '0.7rem', color: 'var(--text-tertiary)'}}>
-                        Compiled instantly from {orders.length} transaction records
+                        Compiled instantly from {orders.length} orders
                       </span>
                     </div>
 
@@ -3998,13 +4073,14 @@ function App() {
                       <table className="admin-table">
                         <thead>
                           <tr>
-                            <th>VIP Client Details</th>
-                            <th>Membership Tier</th>
-                            <th>Fulfillment Orders</th>
-                            <th>Total Lifetime Spend</th>
-                            <th>Preferred Fragrance Family</th>
-                            <th>Private VIP Tags</th>
-                            <th>Actions</th>
+                            <th>Customer Name</th>
+                            <th>Gender</th>
+                            <th>Phone Number</th>
+                            <th>Email Address</th>
+                            <th>Perfumes Bought</th>
+                            <th>Total Bought</th>
+                            <th>Most Favorite Perfume</th>
+                            <th style={{textAlign: 'right'}}>Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -4014,15 +4090,16 @@ function App() {
                               return c.name.toLowerCase().includes(q) ||
                                      c.phone.toLowerCase().includes(q) ||
                                      c.email.toLowerCase().includes(q) ||
-                                     c.vipTags.some(t => t.toLowerCase().includes(q)) ||
-                                     c.membership.toLowerCase().includes(q);
+                                     c.gender.toLowerCase().includes(q) ||
+                                     c.favoritePerfume.toLowerCase().includes(q) ||
+                                     c.perfumesBought.toLowerCase().includes(q);
                             });
 
                             if (filtered.length === 0) {
                               return (
                                 <tr>
-                                  <td colSpan="7" style={{textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)'}}>
-                                    — No client records match your search criteria —
+                                  <td colSpan="8" style={{textAlign: 'center', padding: '40px 0', color: 'var(--text-tertiary)'}}>
+                                    — No customer records match your search criteria —
                                   </td>
                                 </tr>
                               );
@@ -4030,61 +4107,60 @@ function App() {
 
                             return filtered.map(c => (
                               <tr key={c.id}>
-                                <td style={{verticalAlign: 'top'}}>
-                                  <div style={{fontWeight: '700', color: 'var(--text-primary)'}}>{c.name}</div>
-                                  <div style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px'}}>WhatsApp: {c.phone}</div>
-                                  <div style={{fontSize: '0.65rem', color: 'var(--text-tertiary)'}}>{c.email}</div>
+                                <td style={{fontWeight: '700', color: 'var(--text-primary)', verticalAlign: 'middle'}}>
+                                  {c.name}
                                 </td>
-                                <td style={{verticalAlign: 'top'}}>
+                                <td style={{verticalAlign: 'middle'}}>
                                   <span className={`admin-status-pill ${
-                                    c.membership.includes('PLATINUM') ? 'status-instock' :
-                                    c.membership.includes('GOLD') ? 'status-lowstock' : 'status-nostock'
-                                  }`} style={{fontSize: '0.6rem', fontWeight: '700', padding: '2px 6px'}}>
-                                    {c.membership.split(' ')[0]} GUEST
+                                    c.gender === 'Woman' ? 'status-lowstock' : 
+                                    c.gender === 'Men' ? 'status-nostock' : 'status-instock'
+                                  }`} style={{fontSize: '0.65rem', padding: '2px 8px', fontWeight: 'bold'}}>
+                                    {c.gender.toUpperCase()}
                                   </span>
                                 </td>
-                                <td style={{verticalAlign: 'top', fontWeight: '600'}}>
-                                  🛍️ {c.ordersCount} order(s)
+                                <td style={{verticalAlign: 'middle'}}>
+                                  <a href={`https://wa.me/${c.phone.replace(/\+/g, '')}`} target="_blank" rel="noopener noreferrer" style={{color: 'var(--accent-gold)', textDecoration: 'underline'}}>
+                                    {c.phone} ↗
+                                  </a>
                                 </td>
-                                <td style={{verticalAlign: 'top', fontWeight: '700', color: 'var(--accent-gold)'}}>
+                                <td style={{color: 'var(--text-secondary)', fontSize: '0.8rem', verticalAlign: 'middle'}}>
+                                  {c.email}
+                                </td>
+                                <td style={{fontSize: '0.75rem', color: 'var(--text-secondary)', maxWdth: '220px', verticalAlign: 'middle'}}>
+                                  {c.perfumesBought}
+                                </td>
+                                <td style={{fontWeight: '700', color: 'var(--accent-gold)', verticalAlign: 'middle'}}>
                                   {c.totalSpent.toLocaleString()} AED
                                 </td>
-                                <td style={{verticalAlign: 'top', textTransform: 'uppercase', fontSize: '0.7rem', color: 'var(--text-secondary)'}}>
-                                  {c.favoriteCategory}
+                                <td style={{fontStyle: 'italic', color: 'var(--text-primary)', verticalAlign: 'middle', fontWeight: '500'}}>
+                                  🌹 {c.favoritePerfume}
                                 </td>
-                                <td style={{verticalAlign: 'top'}}>
-                                  <div style={{display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '180px'}}>
-                                    {c.vipTags.length === 0 ? (
-                                      <span style={{fontSize: '0.65rem', color: 'var(--text-tertiary)', fontStyle: 'italic'}}>No tags added</span>
-                                    ) : (
-                                      c.vipTags.map((t, idx) => (
-                                        <span key={idx} style={{
-                                          fontSize: '0.55rem',
-                                          fontWeight: '700',
-                                          backgroundColor: 'rgba(218, 165, 32, 0.08)',
-                                          border: '1px solid rgba(218, 165, 32, 0.15)',
-                                          color: 'var(--accent-gold)',
-                                          padding: '2px 6px',
-                                          borderRadius: '3px',
-                                          textTransform: 'uppercase'
-                                        }}>
-                                          {t}
-                                        </span>
-                                      ))
-                                    )}
+                                <td style={{textAlign: 'right', verticalAlign: 'middle'}}>
+                                  <div style={{display: 'flex', gap: '8px', justifyContent: 'flex-end'}}>
+                                    <button
+                                      className="admin-tag-toggle"
+                                      onClick={() => {
+                                        setEditingCrmClient({
+                                          originalPhone: c.phone,
+                                          originalName: c.name,
+                                          name: c.name,
+                                          phone: c.phone,
+                                          email: c.email === 'No Email Logged' ? '' : c.email,
+                                          gender: c.gender
+                                        });
+                                      }}
+                                      style={{padding: '4px 10px', fontSize: '0.65rem', border: '1px solid var(--accent-gold)'}}
+                                    >
+                                      [EDIT]
+                                    </button>
+                                    <button
+                                      className="admin-tag-toggle"
+                                      onClick={() => handleDeleteCrmClient(c)}
+                                      style={{padding: '4px 10px', fontSize: '0.65rem', backgroundColor: 'rgba(231, 76, 60, 0.08)', border: '1px solid #e74c3c', color: '#e74c3c'}}
+                                    >
+                                      [DELETE]
+                                    </button>
                                   </div>
-                                </td>
-                                <td style={{verticalAlign: 'top'}}>
-                                  <button
-                                    className="admin-tag-toggle"
-                                    onClick={() => {
-                                      setActiveCrmClient(c);
-                                      setNewVipTag('');
-                                    }}
-                                    style={{padding: '4px 10px', fontSize: '0.65rem'}}
-                                  >
-                                    [OPEN PROFILE]
-                                  </button>
                                 </td>
                               </tr>
                             ));
@@ -5088,223 +5164,79 @@ function App() {
         </div>
       )}
 
-      {/* VIP CLIENT CRM DETAIL DRAWER */}
-      {activeCrmClient && (
-        <div className="overlay-container" onClick={() => setActiveCrmClient(null)}>
-          <div className="blog-reader-modal admin-edit-drawer" onClick={e => e.stopPropagation()} style={{maxWidth: '750px'}}>
-            <button className="close-btn" onClick={() => setActiveCrmClient(null)}>×</button>
+      {/* CRM CLIENT EDIT OVERLAY DRAWER */}
+      {editingCrmClient && (
+        <div className="overlay-container" onClick={() => setEditingCrmClient(null)}>
+          <div className="blog-reader-modal admin-edit-drawer" onClick={e => e.stopPropagation()} style={{maxWidth: '600px'}}>
+            <button className="close-btn" onClick={() => setEditingCrmClient(null)}>×</button>
             <div className="blog-reader-content">
-              <span className="section-category" style={{color: 'var(--accent-gold)', fontWeight: '700'}}>VIP CLIENT PROFILE</span>
-              <h2 className="font-serif" style={{fontSize: '2.2rem', marginBottom: '4px'}}>{activeCrmClient.name}</h2>
-              <span className={`admin-status-pill ${
-                activeCrmClient.membership.includes('PLATINUM') ? 'status-instock' :
-                activeCrmClient.membership.includes('GOLD') ? 'status-lowstock' : 'status-nostock'
-              }`} style={{fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', letterSpacing: '1px'}}>
-                {activeCrmClient.membership}
-              </span>
+              <span className="section-category" style={{color: 'var(--accent-gold)', fontWeight: '700'}}>CRM Database</span>
+              <h2 className="font-serif" style={{fontSize: '2rem'}}>Edit Customer Profile</h2>
+              <p style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '20px'}}>Update customer records. Changes will apply to all orders placed by this customer.</p>
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                gap: '16px',
-                marginTop: '24px',
-                padding: '16px',
-                backgroundColor: 'var(--bg-secondary)',
-                border: '1px solid var(--border-primary)',
-                borderRadius: '4px'
-              }}>
-                <div>
-                  <div style={{fontSize: '0.6rem', color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase'}}>WhatsApp Contact</div>
-                  <div style={{fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '4px'}}>
-                    <a href={`https://wa.me/${activeCrmClient.phone.replace(/\+/g, '')}`} target="_blank" rel="noopener noreferrer" style={{color: 'var(--accent-gold)', textDecoration: 'underline'}}>
-                      {activeCrmClient.phone} ↗
-                    </a>
-                  </div>
-                </div>
-                <div>
-                  <div style={{fontSize: '0.6rem', color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase'}}>Email Address</div>
-                  <div style={{fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '4px'}}>
-                    {activeCrmClient.email || '—'}
-                  </div>
-                </div>
-                <div>
-                  <div style={{fontSize: '0.6rem', color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase'}}>Lifetime Orders</div>
-                  <div style={{fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '4px'}}>
-                    🛍️ {activeCrmClient.ordersCount}
-                  </div>
-                </div>
-                <div>
-                  <div style={{fontSize: '0.6rem', color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase'}}>Total Spend</div>
-                  <div style={{fontSize: '0.85rem', fontWeight: '700', color: 'var(--accent-gold)', marginTop: '4px'}}>
-                    {activeCrmClient.totalSpent.toLocaleString()} AED
-                  </div>
-                </div>
-                <div>
-                  <div style={{fontSize: '0.6rem', color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase'}}>Fav Scent Family</div>
-                  <div style={{fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '4px', textTransform: 'uppercase'}}>
-                    {activeCrmClient.favoriteCategory}
-                  </div>
-                </div>
-                <div>
-                  <div style={{fontSize: '0.6rem', color: 'var(--text-tertiary)', letterSpacing: '0.05em', textTransform: 'uppercase'}}>Last Active</div>
-                  <div style={{fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)', marginTop: '4px'}}>
-                    {activeCrmClient.lastActive ? new Date(activeCrmClient.lastActive).toLocaleDateString('en-AE', {day: 'numeric', month: 'short', year: 'numeric'}) : '—'}
-                  </div>
-                </div>
-              </div>
-
-              {/* Tag Management */}
-              <div style={{marginTop: '24px'}}>
-                <label className="form-label" style={{fontSize: '0.65rem', marginBottom: '8px'}}>PRIVATE VIP TAGS</label>
-                <div style={{display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px'}}>
-                  {activeCrmClient.vipTags.length === 0 ? (
-                    <span style={{fontSize: '0.75rem', color: 'var(--text-tertiary)', fontStyle: 'italic'}}>No VIP tags assigned. Add tags below to catalog client details (e.g. Scent Lover, Collector, VIP 2026).</span>
-                  ) : (
-                    activeCrmClient.vipTags.map((tag, idx) => (
-                      <span key={idx} style={{
-                        fontSize: '0.65rem',
-                        fontWeight: '700',
-                        backgroundColor: 'rgba(218, 165, 32, 0.08)',
-                        border: '1px solid rgba(218, 165, 32, 0.15)',
-                        color: 'var(--accent-gold)',
-                        padding: '4px 8px',
-                        borderRadius: '3px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        textTransform: 'uppercase'
-                      }}>
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updatedTags = activeCrmClient.vipTags.filter(t => t !== tag);
-                            const updatedClient = { ...activeCrmClient, vipTags: updatedTags };
-                            setActiveCrmClient(updatedClient);
-                            handleSaveCrmMetadata(activeCrmClient.phone, activeCrmClient.staffNotes, updatedTags);
-                          }}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--accent-gold)',
-                            cursor: 'pointer',
-                            padding: 0,
-                            fontSize: '0.8rem',
-                            fontWeight: 'bold',
-                            lineHeight: 1
-                          }}
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))
-                  )}
-                </div>
-                <div style={{display: 'flex', gap: '8px', maxWidth: '350px'}}>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                handleSaveCrmClientEdits(
+                  editingCrmClient.originalPhone,
+                  editingCrmClient.originalName,
+                  editingCrmClient.name,
+                  editingCrmClient.phone,
+                  editingCrmClient.email,
+                  editingCrmClient.gender
+                );
+              }} className="admin-modal-form" style={{marginTop: '20px'}}>
+                <div className="form-group">
+                  <label className="form-label">CUSTOMER FULL NAME</label>
                   <input
                     type="text"
                     className="form-input"
-                    placeholder="E.g., Sweet Lover"
-                    value={newVipTag}
-                    onChange={e => setNewVipTag(e.target.value)}
-                    style={{padding: '8px 12px', fontSize: '0.75rem', borderRadius: '2px'}}
+                    required
+                    value={editingCrmClient.name}
+                    onChange={e => setEditingCrmClient({ ...editingCrmClient, name: e.target.value })}
                   />
-                  <button
-                    type="button"
-                    className="admin-tag-toggle"
-                    onClick={() => {
-                      const trimmed = newVipTag.trim();
-                      if (trimmed) {
-                        if (activeCrmClient.vipTags.includes(trimmed)) return;
-                        const updatedTags = [...activeCrmClient.vipTags, trimmed];
-                        const updatedClient = { ...activeCrmClient, vipTags: updatedTags };
-                        setActiveCrmClient(updatedClient);
-                        setNewVipTag('');
-                        handleSaveCrmMetadata(activeCrmClient.phone, activeCrmClient.staffNotes, updatedTags);
-                      }
-                    }}
-                    style={{padding: '0 16px', fontSize: '0.7rem', fontWeight: 'bold'}}
-                  >
-                    ADD TAG
-                  </button>
                 </div>
-              </div>
 
-              {/* Private Staff Notes */}
-              <div style={{marginTop: '24px'}}>
-                <label className="form-label" style={{fontSize: '0.65rem', marginBottom: '8px'}}>ATELIER CRM PRIVATE NOTES (ONLY VISIBLE TO STAFF)</label>
-                <textarea
-                  className="form-input"
-                  style={{minHeight: '100px', fontSize: '0.8rem', lineHeight: '1.5', padding: '12px'}}
-                  placeholder="Record private customer scent preferences, customized batch numbers requested, special shipping instructions, or luxury details..."
-                  value={activeCrmClient.staffNotes}
-                  onChange={e => {
-                    const notes = e.target.value;
-                    const updatedClient = { ...activeCrmClient, staffNotes: notes };
-                    setActiveCrmClient(updatedClient);
-                    handleSaveCrmMetadata(activeCrmClient.phone, notes, activeCrmClient.vipTags);
-                  }}
-                />
-              </div>
-
-              {/* Transaction / Chronological Order History */}
-              <div style={{marginTop: '32px', borderTop: '1px solid var(--border-primary)', paddingTop: '24px'}}>
-                <h4 className="font-serif" style={{fontSize: '1.25rem', marginBottom: '12px'}}>Bespoke Transaction History ({activeCrmClient.ordersCount})</h4>
-                <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
-                  {activeCrmClient.ordersList.map((order, idx) => (
-                    <div key={idx} style={{
-                      backgroundColor: 'var(--bg-secondary)',
-                      border: '1px solid var(--border-primary)',
-                      borderRadius: '4px',
-                      padding: '16px'
-                    }}>
-                      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px'}}>
-                        <div>
-                          <span style={{fontWeight: '700', fontSize: '0.85rem', color: 'var(--text-primary)'}}>{order.order_number || order.orderNumber}</span>
-                          <span style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '8px'}}>
-                            {new Date(order.created_at || order.date).toLocaleDateString('en-AE', {day: 'numeric', month: 'short', year: 'numeric'})}
-                          </span>
-                        </div>
-                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}>
-                          <span className={`admin-status-pill status-${order.status || 'pending'}`} style={{fontSize: '0.6rem', fontWeight: '700', padding: '2px 6px'}}>
-                            {order.status?.toUpperCase() || 'RECEIVED'}
-                          </span>
-                          <span style={{fontWeight: '700', color: 'var(--accent-gold)', fontSize: '0.85rem'}}>
-                            {(order.total_amount || order.total || 0).toLocaleString()} AED
-                          </span>
-                        </div>
-                      </div>
-                      <div style={{
-                        marginTop: '12px',
-                        paddingTop: '12px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.03)',
-                        fontSize: '0.75rem',
-                        color: 'var(--text-secondary)'
-                      }}>
-                        <strong style={{color: 'var(--text-primary)'}}>Items:</strong> {Array.isArray(order.items) ? order.items.map(item => `${item.qty}x ${item.name} (${item.price} AED)`).join(', ') : '—'}
-                      </div>
-                      {(order.tracking_number || order.trackingNumber) && (
-                        <div style={{fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '8px'}}>
-                          AWB tracking: <strong>{order.tracking_number || order.trackingNumber}</strong>
-                          {(order.tracking_link || order.trackingLink) && <a href={order.tracking_link || order.trackingLink} target="_blank" rel="noopener noreferrer" style={{marginLeft: '8px', color: 'var(--accent-gold)', textDecoration: 'underline'}}>Follow ↗</a>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="form-group-row">
+                  <div className="form-group">
+                    <label className="form-label">CUSTOMER GENDER</label>
+                    <select
+                      className="form-input"
+                      value={editingCrmClient.gender}
+                      onChange={e => setEditingCrmClient({ ...editingCrmClient, gender: e.target.value })}
+                    >
+                      <option value="Unisex">Unisex</option>
+                      <option value="Woman">Woman</option>
+                      <option value="Men">Men</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">WHATSAPP PHONE</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      required
+                      value={editingCrmClient.phone}
+                      onChange={e => setEditingCrmClient({ ...editingCrmClient, phone: e.target.value })}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div style={{marginTop: '32px', display: 'flex', justifyContent: 'flex-end'}}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setActiveCrmClient(null)}
-                  style={{padding: '12px 24px'}}
-                >
-                  DISMISS DRAWER
-                </button>
-              </div>
+                <div className="form-group">
+                  <label className="form-label">EMAIL ADDRESS</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={editingCrmClient.email}
+                    onChange={e => setEditingCrmClient({ ...editingCrmClient, email: e.target.value })}
+                    placeholder="e.g. customer@domain.ae"
+                  />
+                </div>
 
+                <div style={{display: 'flex', gap: '16px', marginTop: '24px'}}>
+                  <button type="submit" className="btn-submit" style={{marginTop: '0', flex: '1'}}>SAVE PROFILE</button>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditingCrmClient(null)} style={{padding: '0 24px'}}>CANCEL</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
