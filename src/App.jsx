@@ -76,6 +76,21 @@ const compressAndProcessImage = (file) => {
 };
 
 function App() {
+  // --- Custom Premium Glassmorphic Toast Notifications ---
+  const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' | 'info' }
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
   // --- Router & History State ---
   const [currentRoute, setCurrentRoute] = useState('/');
   const [scopedProductSlug, setScopedProductSlug] = useState(null);
@@ -218,6 +233,7 @@ function App() {
     isCustomCategory: false,
     price: '',
     stock_status: 'in_stock',
+    stock_quantity: '10',
     scent_family: '',
     key_notes: '',
     description: '',
@@ -605,7 +621,7 @@ function App() {
       setAdminPasscode('');
       setShowPasscode(false); // Reset visibility state
     } else {
-      alert("Security Authentication Failed: Invalid Passcode.");
+      showToast("Security Authentication Failed: Invalid Passcode.", "error");
       setAdminPasscode('');
     }
   };
@@ -757,7 +773,7 @@ function App() {
       setTimeout(() => setSyncNotification(null), 3000);
     } catch (err) {
       console.error("Failed to save CRM client edits:", err);
-      alert("Error occurred while saving customer profile updates.");
+      showToast("Error occurred while saving customer profile updates.", "error");
     }
   };
 
@@ -793,7 +809,7 @@ function App() {
         setTimeout(() => setSyncNotification(null), 3000);
       } catch (err) {
         console.error("Failed to delete customer profile:", err);
-        alert("Error occurred while deleting customer profile.");
+        showToast("Error occurred while deleting customer profile.", "error");
       }
     }
   };
@@ -861,7 +877,7 @@ function App() {
       category: resolvedCategory,
       price: parseFloat(newProductForm.price),
       stock_status: newProductForm.stock_status,
-      stock_quantity: 10,
+      stock_quantity: parseInt(newProductForm.stock_quantity || 0),
       scent_family: newProductForm.scent_family,
       key_notes: newProductForm.key_notes.split(',').map(n => n.trim()),
       description: newProductForm.description,
@@ -894,6 +910,7 @@ function App() {
         isCustomCategory: false,
         price: '',
         stock_status: 'in_stock',
+        stock_quantity: '10',
         scent_family: '',
         key_notes: '',
         description: '',
@@ -905,7 +922,7 @@ function App() {
         scarcity_note: 'Limited Release — Unique Edition',
         images: []
       });
-      alert(`Published Successfully! New link generated at: elixyr.ae/${savedProduct.slug}`);
+      showToast("Fragrance published successfully!");
     });
   };
 
@@ -919,6 +936,14 @@ function App() {
 
   const handleUpdateProductStock = (id, newStatus) => {
     database.updateProduct(id, { stock_status: newStatus }).then(updatedProduct => {
+      setProducts(products.map(p => p.id === id ? updatedProduct : p));
+    });
+  };
+
+  const handleUpdateProductStockQty = (id, newQty) => {
+    const qty = parseInt(newQty);
+    if (isNaN(qty)) return;
+    database.updateProduct(id, { stock_quantity: qty }).then(updatedProduct => {
       setProducts(products.map(p => p.id === id ? updatedProduct : p));
     });
   };
@@ -963,7 +988,7 @@ function App() {
       }
 
       setEditingProduct(null);
-      alert("Product details updated successfully!");
+      showToast("Product details updated successfully!");
     });
   };
 
@@ -996,7 +1021,7 @@ function App() {
         image_url: '',
         extra_images: []
       });
-      alert("New lifestyle guide published to Journal successfully!");
+      showToast("New lifestyle guide published to Journal successfully!");
     });
   };
 
@@ -1008,11 +1033,11 @@ function App() {
     database.updateBlog ? database.updateBlog(editingBlog.id, updatedBlog).then(saved => {
       setBlogs(blogs.map(b => b.id === editingBlog.id ? saved : b));
       setEditingBlog(null);
-      alert('Article updated successfully!');
+      showToast("Article updated successfully!");
     }) : (() => {
       setBlogs(blogs.map(b => b.id === editingBlog.id ? updatedBlog : b));
       setEditingBlog(null);
-      alert('Article updated successfully!');
+      showToast("Article updated successfully!");
     })();
   };
 
@@ -1035,11 +1060,11 @@ function App() {
           tracking_link: res.trackingLink
         });
         setOrders(orders.map(o => o.id === order.id ? updated : o));
-        alert(`Logistics Booked Successfully!\nAWB Acknowledged: ${res.trackingNumber}\nStatus updated to Out for Delivery.`);
+        showToast(`Logistics Booked Successfully! AWB: ${res.trackingNumber}`);
       }
     } catch (err) {
       console.error("Failed to book courier delivery shipment:", err);
-      alert("Error booking courier delivery shipment.");
+      showToast("Error booking courier delivery shipment.", "error");
     }
   };
 
@@ -1082,10 +1107,10 @@ function App() {
 
       setOrders(orders.map(o => o.id === editingOrder.id ? normalized : o));
       setEditingOrder(null);
-      alert("Order details updated successfully!");
+      showToast("Order details updated successfully!");
     } catch (err) {
       console.error("Failed to save order edits:", err);
-      alert("Error saving order updates.");
+      showToast("Error saving order updates.", "error");
     }
   };
 
@@ -1104,7 +1129,7 @@ function App() {
     try {
       const res = await integrationServices.sendWhatsAppReceipt(order, order.tracking_link, order.tracking_number);
       if (res.success) {
-        alert("WhatsApp Concierge deep-link simulated. Review local terminal logs for Meta payload details.");
+        showToast("WhatsApp Concierge simulated. Check console.", "info");
       }
     } catch (err) {
       console.error(err);
@@ -1115,7 +1140,7 @@ function App() {
     try {
       const res = await integrationServices.sendEmailReceipt(order, order.tracking_link, order.tracking_number);
       if (res.success) {
-        alert("Email Dispatch simulated. Review console logs for elegant luxury HTML structure.");
+        showToast("Email Dispatch simulated. Check console.", "info");
       }
     } catch (err) {
       console.error(err);
@@ -3121,6 +3146,35 @@ function App() {
                           </div>
                         </div>
 
+                        <div className="form-group-row">
+                          <div className="form-group">
+                            <label className="form-label">STOCK STATUS</label>
+                            <select 
+                              className="form-input" 
+                              required
+                              value={newProductForm.stock_status}
+                              onChange={e => setNewProductForm({...newProductForm, stock_status: e.target.value})}
+                            >
+                              <option value="in_stock">In Stock</option>
+                              <option value="low_stock">Low Stock</option>
+                              <option value="out_of_stock">Out of Stock</option>
+                              <option value="on_demand">Manufacture on Demand</option>
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">INITIAL STOCK QUANTITY</label>
+                            <input 
+                              type="number" 
+                              min="0"
+                              className="form-input" 
+                              required 
+                              placeholder="e.g. 10"
+                              value={newProductForm.stock_quantity}
+                              onChange={e => setNewProductForm({...newProductForm, stock_quantity: e.target.value})}
+                            />
+                          </div>
+                        </div>
+
                         <div className="form-group">
                           <label className="form-label">KEY NOTES LIST (COMMA SEPARATED)</label>
                           <input 
@@ -3181,7 +3235,7 @@ function App() {
                                     }));
                                   } catch (error) {
                                     console.error("Error processing images:", error);
-                                    alert("Could not process some images. Please try another file.");
+                                    showToast("Could not process some images. Please try another file.", "error");
                                   }
                                 }
                               }} 
@@ -3230,6 +3284,7 @@ function App() {
                             <th>Name</th>
                             <th>Category</th>
                             <th>Price</th>
+                            <th>Stock Qty</th>
                             <th>Stock Status</th>
                             <th>Stock Management</th>
                             <th>Actions</th>
@@ -3255,9 +3310,19 @@ function App() {
                                 />
                               </td>
                               <td>
+                                <input 
+                                  type="number" 
+                                  defaultValue={p.stock_quantity ?? 10} 
+                                  className="form-input" 
+                                  style={{width: '70px', padding: '6px'}}
+                                  onBlur={(e) => handleUpdateProductStockQty(p.id, e.target.value)}
+                                />
+                              </td>
+                              <td>
                                 <span className={`admin-status-pill ${
                                   p.stock_status === 'in_stock' ? 'status-instock' :
-                                  p.stock_status === 'low_stock' ? 'status-lowstock' : 'status-nostock'
+                                  p.stock_status === 'low_stock' ? 'status-lowstock' : 
+                                  p.stock_status === 'on_demand' ? 'status-ondemand' : 'status-nostock'
                                 }`}>
                                   {p.stock_status.replace('_', ' ')}
                                 </span>
@@ -3272,6 +3337,7 @@ function App() {
                                   <option value="in_stock">In Stock</option>
                                   <option value="low_stock">Low Stock</option>
                                   <option value="out_of_stock">Out of Stock</option>
+                                  <option value="on_demand">Manufacture on Demand</option>
                                 </select>
                               </td>
                               <td>
@@ -3394,7 +3460,7 @@ function App() {
                                     }));
                                   } catch (error) {
                                     console.error("Error processing image:", error);
-                                    alert("Could not process the cover image. Please try another file.");
+                                    showToast("Could not process the cover image. Please try another file.", "error");
                                   }
                                 }
                               }} 
@@ -3439,7 +3505,7 @@ function App() {
                                     }));
                                   } catch (error) {
                                     console.error("Error processing gallery images:", error);
-                                    alert("Could not process some gallery images. Please try another file.");
+                                    showToast("Could not process some gallery images. Please try another file.", "error");
                                   }
                                 }
                               }} 
@@ -3736,14 +3802,14 @@ function App() {
                         const newCat = newCategoryInput.trim().toUpperCase();
                         if (!newCat) return;
                         if (categories.includes(newCat)) {
-                          alert("This category already exists!");
+                          showToast("This category already exists!", "error");
                           return;
                         }
                         const updated = [...categories, newCat];
                         setCategories(updated);
                         localStorage.setItem('elixyr_product_categories_v2', JSON.stringify(updated));
                         setNewCategoryInput('');
-                        alert(`Category "${newCat}" successfully registered!`);
+                        showToast(`Category "${newCat}" registered successfully!`);
                       }} style={{display: 'flex', gap: '12px'}}>
                         <input 
                           type="text"
@@ -3790,7 +3856,7 @@ function App() {
                                         const cleanVal = editingCategoryInput.trim().toUpperCase();
                                         if (!cleanVal) return;
                                         if (categories.includes(cleanVal) && cleanVal !== cat) {
-                                          alert("This category already exists!");
+                                          showToast("This category already exists!", "error");
                                           return;
                                         }
                                         
@@ -3811,7 +3877,7 @@ function App() {
                                         setProducts(updatedProds);
 
                                         setEditingCategoryName(null);
-                                        alert(`Category name successfully updated to "${cleanVal}"!`);
+                                        showToast(`Category updated to "${cleanVal}" successfully!`);
                                       }}
                                       style={{padding: '4px 12px', fontSize: '0.65rem'}}
                                     >
@@ -3873,7 +3939,7 @@ function App() {
                                               localStorage.setItem('elixyr_product_categories_v2', JSON.stringify(newCats));
                                             }
 
-                                            alert(`Category "${cat}" successfully deleted!`);
+                                            showToast(`Category "${cat}" deleted successfully!`);
                                           }
                                         }}
                                         style={{fontSize: '0.65rem', textDecoration: 'underline', color: '#e74c3c'}}
@@ -3906,12 +3972,12 @@ function App() {
                         // Generate a key (e.g. "Ready for Dispatch" -> "ready_for_dispatch")
                         const newKey = cleanLabel.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
                         if (!newKey) {
-                          alert("Invalid status label. Please use alphanumeric characters.");
+                          showToast("Invalid status label. Please use alphanumeric characters.", "error");
                           return;
                         }
                         
                         if (fulfillmentStatuses.some(s => s.key === newKey)) {
-                          alert(`A status with key "${newKey}" or similar label already exists!`);
+                          showToast(`A status with key "${newKey}" already exists!`, "error");
                           return;
                         }
                         
@@ -3919,7 +3985,7 @@ function App() {
                         setFulfillmentStatuses(updated);
                         localStorage.setItem('elixyr_fulfillment_statuses_v2', JSON.stringify(updated));
                         setNewStatusLabel('');
-                        alert(`Status "${cleanLabel}" successfully registered!`);
+                        showToast(`Status "${cleanLabel}" registered successfully!`);
                       }} style={{display: 'flex', gap: '12px'}}>
                         <input 
                           type="text"
@@ -3975,7 +4041,7 @@ function App() {
                                         setFulfillmentStatuses(updated);
                                         localStorage.setItem('elixyr_fulfillment_statuses_v2', JSON.stringify(updated));
                                         setEditingStatusKey(null);
-                                        alert(`Status label updated to "${cleanLabel}"!`);
+                                        showToast(`Status label updated to "${cleanLabel}" successfully!`);
                                       }}
                                       style={{padding: '4px 12px', fontSize: '0.65rem'}}
                                     >
@@ -4030,7 +4096,7 @@ function App() {
                                               const updatedStatuses = fulfillmentStatuses.filter(s => s.key !== status.key);
                                               setFulfillmentStatuses(updatedStatuses);
                                               localStorage.setItem('elixyr_fulfillment_statuses_v2', JSON.stringify(updatedStatuses));
-                                              alert(`Status "${status.label}" successfully deleted!`);
+                                              showToast(`Status "${status.label}" deleted successfully!`);
                                             }
                                           }}
                                           style={{fontSize: '0.65rem', textDecoration: 'underline', color: '#e74c3c'}}
@@ -4527,7 +4593,7 @@ function App() {
                     paymentMethod: 'WhatsApp Order Concierge',
                     items: []
                   });
-                  alert(`Manual Order ${savedRecord.order_number} successfully registered!`);
+                  showToast(`Manual Order ${savedRecord.order_number} registered successfully!`);
                 });
               }} className="admin-modal-form" style={{marginTop: '20px'}}>
                 <div className="form-group-row">
@@ -4924,6 +4990,34 @@ function App() {
                   </div>
                 </div>
 
+                <div className="form-group-row">
+                  <div className="form-group">
+                    <label className="form-label">STOCK STATUS</label>
+                    <select 
+                      className="form-input" 
+                      required
+                      value={editingProduct.stock_status || 'in_stock'}
+                      onChange={e => setEditingProduct({...editingProduct, stock_status: e.target.value})}
+                    >
+                      <option value="in_stock">In Stock</option>
+                      <option value="low_stock">Low Stock</option>
+                      <option value="out_of_stock">Out of Stock</option>
+                      <option value="on_demand">Manufacture on Demand</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">STOCK QUANTITY</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="form-input" 
+                      required 
+                      value={editingProduct.stock_quantity ?? 10}
+                      onChange={e => setEditingProduct({...editingProduct, stock_quantity: parseInt(e.target.value || 0)})}
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">KEY NOTES LIST (COMMA SEPARATED)</label>
                   <input 
@@ -4970,7 +5064,7 @@ function App() {
                             }));
                           } catch (error) {
                             console.error("Error processing images:", error);
-                            alert("Could not process some images. Please try another file.");
+                            showToast("Could not process some images. Please try another file.", "error");
                           }
                         }
                       }} 
@@ -5102,7 +5196,7 @@ function App() {
                             }));
                           } catch (error) {
                             console.error("Error processing image:", error);
-                            alert("Could not process the cover image. Please try another file.");
+                            showToast("Could not process the cover image. Please try another file.", "error");
                           }
                         }
                       }} 
@@ -5147,7 +5241,7 @@ function App() {
                             }));
                           } catch (error) {
                             console.error("Error processing gallery images:", error);
-                            alert("Could not process some gallery images. Please try another file.");
+                            showToast("Could not process some gallery images. Please try another file.", "error");
                           }
                         }
                       }} 
@@ -5342,6 +5436,19 @@ function App() {
             </div>
           </div>
         </footer>
+      )}
+
+      {/* Premium In-App Toast Container */}
+      {toast && (
+        <div className="custom-toast-container">
+          <div className={`custom-toast ${toast.type || 'success'}`}>
+            <span className="toast-icon">
+              {toast.type === 'error' ? '⚠️' : toast.type === 'info' ? 'ℹ️' : '⚜️'}
+            </span>
+            <span className="toast-message">{toast.message}</span>
+            <button className="toast-close" onClick={() => setToast(null)}>×</button>
+          </div>
+        </div>
       )}
 
     </div>
