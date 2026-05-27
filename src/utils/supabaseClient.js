@@ -76,7 +76,7 @@ const saveLocalBlogs = (blogs) => {
 // =========================================================================
 export const sanitizeUAEPhone = (phone) => {
   if (!phone) return '';
-  let rawPhone = phone.replace(/[\s\-\(\)\+]/g, ''); // strip spaces, dashes, brackets, and plusses
+  let rawPhone = phone.replace(/[\s\-()+]/g, ''); // strip spaces, dashes, brackets, and plusses
   
   if (rawPhone.startsWith('00971')) {
     return '+' + rawPhone.slice(2);

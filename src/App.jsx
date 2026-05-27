@@ -11,18 +11,12 @@ import {
 import { database, sanitizeUAEPhone, isValidUAEPhone } from './utils/supabaseClient';
 import { integrationServices } from './utils/deliveryServices';
 import logoNoBg from './assets/logo_no_bg.png';
-import elixyrEmblem from './assets/elixyr_emblem.jpg';
 import elixyrTag from './assets/elixyr_tag.jpg';
 import logoWithBgBlack from './assets/logo_with_bg_black.jpg';
 import logoWithBgCream from './assets/logo_with_bg_cream.jpg';
 import bespokeOudReserve from './assets/bespoke_oud_reserve.png';
 import sommelierBlotters from './assets/sommelier_blotters.png';
-import ghibliPending from './assets/ghibli_pending.png';
-import ghibliStockReserved from './assets/ghibli_stock_reserved.png';
-import ghibliReadyForDispatch from './assets/ghibli_ready_for_dispatch.png';
-import ghibliOutForDelivery from './assets/ghibli_out_for_delivery.png';
-import ghibliDelivered from './assets/ghibli_delivered.png';
-import ghibliCancelled from './assets/ghibli_cancelled.png';
+
 
 // Standard secure SHA-256 native browser hashing helper
 async function sha256(message) {
@@ -125,9 +119,7 @@ function App() {
   const [searchOrderId, setSearchOrderId] = useState('');
   const [trackedOrder, setTrackedOrder] = useState(null);
   const [trackingError, setTrackingError] = useState(false);
-  const [customProductCategory, setCustomProductCategory] = useState('');
-  const [customBlogCategory, setCustomBlogCategory] = useState('');
-  const [customEditProductCategory, setCustomEditProductCategory] = useState('');
+
   const [categories, setCategories] = useState(['OUD BLENDS', 'MUSK BLENDS', 'SIGNATURE EXTRAITS']);
   const [newCategoryInput, setNewCategoryInput] = useState('');
   const [editingCategoryName, setEditingCategoryName] = useState(null);
@@ -240,10 +232,11 @@ function App() {
   const [crmMetadata, setCrmMetadata] = useState({});
   const [crmSearchQuery, setCrmSearchQuery] = useState('');
   const [activeCrmClient, setActiveCrmClient] = useState(null);
-  const [newVipTag, setNewVipTag] = useState('');
+
   const [editingCrmClient, setEditingCrmClient] = useState(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveImageIdx(0);
   }, [scopedProductSlug]);
 
@@ -765,6 +758,7 @@ function App() {
     });
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleSaveCrmMetadata = (phoneKey, updatedNotes, updatedTags, updatedGender) => {
     const current = crmMetadata[phoneKey] || {};
     const updated = {
