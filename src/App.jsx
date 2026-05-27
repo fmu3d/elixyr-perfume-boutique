@@ -182,7 +182,8 @@ function App() {
     email: '',
     phone: '',
     emirate: 'Dubai (15 AED)',
-    paymentMethod: 'WhatsApp Order Concierge'
+    paymentMethod: 'WhatsApp Order Concierge',
+    gender: 'Rather not say'
   });
   const [orderNumber, setOrderNumber] = useState('ELX-01007');
 
@@ -516,6 +517,19 @@ function App() {
       delivery,
       total: grandTotal
     };
+    
+    // Auto-update CRM gender metadata based on checkout selection
+    const currentMeta = crmMetadata[cleanPhone] || {};
+    const updatedMeta = {
+      ...crmMetadata,
+      [cleanPhone]: {
+        ...currentMeta,
+        gender: checkoutForm.gender || 'Rather not say'
+      }
+    };
+    setCrmMetadata(updatedMeta);
+    localStorage.setItem('elixyr_crm_metadata_v2', JSON.stringify(updatedMeta));
+
     setFinalizedOrder(finalizedReceipt);
 
     // Insert order into the database (Supabase or Local fallback)
@@ -1603,6 +1617,21 @@ function App() {
                         <option>Ajman (20 AED)</option>
                         <option>Ras Al Khaimah (25 AED)</option>
                         <option>Fujairah (25 AED)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">GENDER</label>
+                      <select 
+                        name="gender" 
+                        className="form-input"
+                        required
+                        value={checkoutForm.gender}
+                        onChange={handleInputChange}
+                      >
+                        <option value="Rather not say">Rather not say</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
                       </select>
                     </div>
 
@@ -4112,8 +4141,8 @@ function App() {
                                 </td>
                                 <td style={{verticalAlign: 'middle'}}>
                                   <span className={`admin-status-pill ${
-                                    c.gender === 'Woman' ? 'status-lowstock' : 
-                                    c.gender === 'Men' ? 'status-nostock' : 'status-instock'
+                                    c.gender === 'Female' ? 'status-lowstock' : 
+                                    c.gender === 'Male' ? 'status-nostock' : 'status-instock'
                                   }`} style={{fontSize: '0.65rem', padding: '2px 8px', fontWeight: 'bold'}}>
                                     {c.gender.toUpperCase()}
                                   </span>
@@ -5205,8 +5234,9 @@ function App() {
                       onChange={e => setEditingCrmClient({ ...editingCrmClient, gender: e.target.value })}
                     >
                       <option value="Unisex">Unisex</option>
-                      <option value="Woman">Woman</option>
-                      <option value="Men">Men</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Rather not say">Rather not say</option>
                     </select>
                   </div>
                   <div className="form-group">
