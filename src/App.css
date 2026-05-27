@@ -2327,7 +2327,7 @@ body.dark .site-footer { background-color: #080808; }
 }
 
 .toast-message {
-  color: var(--text-primary);
+  color: #FAF9F5 !important;
   font-family: var(--font-sans);
   font-size: 0.85rem;
   font-weight: 500;
@@ -2339,7 +2339,7 @@ body.dark .site-footer { background-color: #080808; }
 .toast-close {
   background: none;
   border: none;
-  color: var(--text-tertiary);
+  color: #8C8C88 !important;
   font-size: 1.3rem;
   cursor: pointer;
   padding: 0;
@@ -2350,7 +2350,7 @@ body.dark .site-footer { background-color: #080808; }
 }
 
 .toast-close:hover {
-  color: var(--text-primary);
+  color: #FAF9F5 !important;
   transform: scale(1.1);
 }
 
