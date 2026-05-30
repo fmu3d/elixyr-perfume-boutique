@@ -4,6 +4,7 @@ import {
   mockProducts, 
   mockBlogs, 
   mockDiscoverySet, 
+  mockCuratedSets,
   ADMIN_HASH, 
   MASTER_HASH,
   DEMO_HASH
@@ -69,6 +70,44 @@ const compressAndProcessImage = (file) => {
   });
 };
 
+const getScentQualifiers = (product) => {
+  // Soft suitability and best for qualifiers aligned with Section 9 & 12
+  let bestFor = "Daily luxury, signature wear, elegant presence";
+  let bestSuitedFor = "Anyone who enjoys premium, sophisticated fragrance profiles";
+
+  const notes = (product.key_notes || []).map(n => n.toLowerCase());
+  const family = (product.scent_family || "").toLowerCase();
+  const name = (product.name || "").toLowerCase();
+
+  if (notes.includes("oud") || family.includes("oud") || name.includes("oud")) {
+    bestFor = "Royal evenings, formal Majlis gatherings, statement wear";
+    bestSuitedFor = "Anyone who enjoys rich, smoky, and highly intense woody scents";
+  } else if (notes.includes("musk") || family.includes("musk") || name.includes("musk")) {
+    bestFor = "Daily signature wear, clean daytime presence, close-skin elegance";
+    bestSuitedFor = "Men and unisex fragrance lovers who appreciate soft, powdery profiles";
+  } else if (notes.includes("amber") || family.includes("amber") || name.includes("amber")) {
+    bestFor = "Intimate evenings, cold-weather comfort, sovereign presence";
+    bestSuitedFor = "Anyone who enjoys deep, warm, and resinous oriental scents";
+  } else if (notes.includes("leather") || family.includes("leather") || name.includes("leather")) {
+    bestFor = "Prestigious gatherings, evening statement, luxury equestrian visits";
+    bestSuitedFor = "Those who command respect with bold, smoky leather and spice elements";
+  } else if (notes.includes("vanilla") || family.includes("vanilla") || name.includes("vanilla")) {
+    bestFor = "Cozy gatherings, romantic dinners, warm comforting trail";
+    bestSuitedFor = "Anyone who enjoys rich, sweet, gourmand, and balsamic scents";
+  } else if (notes.includes("rose") || notes.includes("jasmine") || notes.includes("neroli")) {
+    bestFor = "Fresh mornings, spring garden outings, clean uplifting radiance";
+    bestSuitedFor = "Unisex fragrance lovers who enjoy vibrant, fresh, and zesty florals";
+  } else if (notes.includes("bergamot") || notes.includes("citrus")) {
+    bestFor = "Vibrant daytime wear, summer freshness, office professional environments";
+    bestSuitedFor = "Anyone looking for a sparkling, clean, and energizing citrus aura";
+  }
+
+  return {
+    bestFor: product.best_for || bestFor,
+    bestSuitedFor: product.best_suited_for || bestSuitedFor
+  };
+};
+
 function App() {
   // --- Custom Premium Glassmorphic Toast Notifications ---
   const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' | 'info' }
@@ -90,6 +129,8 @@ function App() {
   const [perfumeSearchQuery, setPerfumeSearchQuery] = useState('');
   const [submittedSearchQuery, setSubmittedSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeCurationView, setActiveCurationView] = useState('sets');
+  const [activeSetDetail, setActiveSetDetail] = useState(null);
 
   // Dynamic autocompletion matching algorithm for store searches
   const getSuggestions = () => {
@@ -183,6 +224,8 @@ function App() {
       setTransparentChibiUrl('/chibi_arab_perfumer.png');
     };
   }, []);
+
+  const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
 
   // --- Dynamic Products, Blogs, & Orders State (Supabase / Local fallback synced) ---
   const [products, setProducts] = useState(() => {
@@ -353,6 +396,18 @@ function App() {
         setCurrentRoute('/payment-soon');
       } else if (path === '/cod-soon') {
         setCurrentRoute('/cod-soon');
+      } else if (path === '/gifting') {
+        setCurrentRoute('/gifting');
+        setScopedProductSlug(null);
+        setScopedBlogSlug(null);
+      } else if (path === '/shipping') {
+        setCurrentRoute('/shipping');
+        setScopedProductSlug(null);
+        setScopedBlogSlug(null);
+      } else if (path === '/returns') {
+        setCurrentRoute('/returns');
+        setScopedProductSlug(null);
+        setScopedBlogSlug(null);
       } else if (path === '/privacy') {
         setCurrentRoute('/privacy');
         setScopedProductSlug(null);
@@ -1293,31 +1348,24 @@ function App() {
           
           <nav>
             <ul className="nav-links">
-              {currentRoute !== '/' && (
-                <li><button onClick={() => navigateTo('/')} className="nav-link">Home</button></li>
-              )}
               <li>
                 <button 
-                  onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} 
-                  className="nav-link"
+                  onClick={() => { navigateTo('/'); }} 
+                  className={`nav-link ${currentRoute === '/' ? 'active' : ''}`}
                 >
-                  Shop
+                  Home
                 </button>
               </li>
               <li>
                 <button 
-                  onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('discovery')?.scrollIntoView({behavior:'smooth'}), 100); }} 
-                  className="nav-link"
+                  onClick={() => { 
+                    navigateTo('/'); 
+                    setActiveCurationView('scents'); 
+                    setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 150); 
+                  }} 
+                  className={`nav-link ${currentRoute === '/' && activeCurationView === 'scents' ? 'active' : ''}`}
                 >
-                  Gifting
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => { navigateTo('/journal'); }} 
-                  className="nav-link"
-                >
-                  Journal
+                  Scents
                 </button>
               </li>
               <li>
@@ -1331,10 +1379,18 @@ function App() {
               </li>
               <li>
                 <button 
-                  onClick={() => navigateTo('/wanna-see-hows-your-order-doing')} 
-                  className="nav-link"
+                  onClick={() => { navigateTo('/gifting'); }} 
+                  className={`nav-link ${currentRoute === '/gifting' ? 'active' : ''}`}
                 >
-                  Track Order
+                  Gifting
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => { navigateTo('/journal'); }} 
+                  className={`nav-link ${currentRoute === '/journal' ? 'active' : ''}`}
+                >
+                  Journal
                 </button>
               </li>
             </ul>
@@ -1351,7 +1407,13 @@ function App() {
                   setPerfumeSearchQuery(e.target.value);
                   setShowSuggestions(true);
                 }}
-                onFocus={() => setShowSuggestions(true)}
+                onFocus={() => {
+                  if (window.innerWidth <= 768) {
+                    setIsMobileSearchActive(true);
+                  } else {
+                    setShowSuggestions(true);
+                  }
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     setActiveCategory('ALL FRAGRANCES'); // Search the whole catalog
@@ -1433,19 +1495,21 @@ function App() {
                 <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); }} className="mobile-nav-link">Home</button>
               </li>
               <li>
-                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} className="mobile-nav-link">Shop</button>
-              </li>
-              <li>
-                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/'); setTimeout(() => document.getElementById('discovery')?.scrollIntoView({behavior:'smooth'}), 100); }} className="mobile-nav-link">Gifting</button>
-              </li>
-              <li>
-                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/journal'); }} className="mobile-nav-link">Journal</button>
+                <button onClick={() => { 
+                  setIsMobileMenuOpen(false); 
+                  navigateTo('/'); 
+                  setActiveCurationView('scents'); 
+                  setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 150); 
+                }} className="mobile-nav-link">Scents</button>
               </li>
               <li>
                 <button onClick={() => { setIsMobileMenuOpen(false); setIsQuizOpen(true); resetQuiz(); }} className="mobile-nav-link" style={{color: 'var(--accent-gold)'}}>Scent Finder</button>
               </li>
               <li>
-                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/wanna-see-hows-your-order-doing'); }} className="mobile-nav-link">Track Order</button>
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/gifting'); }} className="mobile-nav-link">Gifting</button>
+              </li>
+              <li>
+                <button onClick={() => { setIsMobileMenuOpen(false); navigateTo('/journal'); }} className="mobile-nav-link">Journal</button>
               </li>
             </ul>
           </div>
@@ -1454,20 +1518,20 @@ function App() {
 
       {/* --- DYNAMIC ROUTER SWEEP --- */}
 
-      {/* ROUTE 1: HOME PAGE ROUTE ('/') */}
       {currentRoute === '/' && (
         <main>
           {/* Hero Frame */}
           <section id="hero" className="hero-section">
             <div className="container hero-grid">
               <div className="hero-content">
-                <h1>Leave a trail they'll never forget.</h1>
-                <p className="hero-description">
-                  A majestic aura of red saffron and smoked agarwood, lingering like a warm memory long after you're gone—an unforgettable essence of you.
+                <span className="section-category" style={{color: 'var(--accent-gold)', letterSpacing: '2px', fontSize: '0.8rem', fontWeight: '600'}}>ELIXYR SCENT SETS</span>
+                <h1 style={{fontSize: 'clamp(2.4rem, 6vw, 3.8rem)', fontWeight: '300', lineHeight: '1.2', marginBottom: '16px'}}>ELIXYR Scent Sets</h1>
+                <p className="hero-description" style={{fontSize: 'clamp(1rem, 2vw, 1.25rem)', color: 'var(--text-secondary)', marginBottom: '28px', maxWidth: '580px'}}>
+                  Curated scent sets for signature moments.
                 </p>
                 
                 {/* Virtual Scent Sommelier Banner Trigger */}
-                <div style={{
+                <div className="sommelier-trigger-banner" style={{
                   backgroundColor: 'var(--accent-gold-light)', 
                   border: '1px solid var(--accent-gold)', 
                   padding: '12px 18px',
@@ -1480,7 +1544,7 @@ function App() {
                   gap: '12px'
                 }}>
                   <div style={{textAlign: 'left'}}>
-                    <span style={{fontSize: '0.6rem', fontWeight: '700', color: 'var(--accent-gold)', letterSpacing: '1px', textTransform: 'uppercase'}}>CAN'T FIND YOUR DESIRED PERFUME?</span>
+                    <span style={{fontSize: '0.6rem', fontWeight: '700', color: 'var(--accent-gold)', letterSpacing: '1px', textTransform: 'uppercase'}}>CONFUSED ON WHICH SCENT TO PICK?</span>
                     <h4 className="font-serif" style={{fontSize: '1.05rem', color: 'var(--text-primary)', marginTop: '2px'}}>Consult Our Virtual Scent Sommelier</h4>
                   </div>
                   <button onClick={() => { setIsQuizOpen(true); resetQuiz(); }} className="btn btn-primary" style={{padding: '8px 16px', fontSize: '0.65rem'}}>
@@ -1489,9 +1553,8 @@ function App() {
                 </div>
 
                 <div className="hero-actions">
-                  <a href="#shop" onClick={(e) => { e.preventDefault(); document.getElementById('shop').scrollIntoView({behavior: 'smooth'}); }} className="btn btn-primary">Explore Shop</a>
-                  <button onClick={() => navigateTo('/journal')} className="btn btn-secondary">Discover Scents</button>
-
+                  <button onClick={() => { setActiveCurationView('sets'); document.getElementById('shop')?.scrollIntoView({behavior: 'smooth'}); }} className="btn btn-primary">Explore Sets</button>
+                  <button onClick={() => { setIsQuizOpen(true); resetQuiz(); }} className="btn btn-secondary">Find My Scent</button>
                 </div>
               </div>
 
@@ -1539,20 +1602,73 @@ function App() {
             </div>
           </section>
 
-          {/* USP Frame */}
-          <section className="usp-section">
-            <div className="container usp-grid">
-              <div className="usp-card">
-                <h3>UAE delivery</h3>
-                <p>Prepared with meticulous care and clear shipping status updates.</p>
-              </div>
-              <div className="usp-card">
-                <h3>Secure checkout</h3>
-                <p>Pay instantly online or continue through the WhatsApp concierge.</p>
-              </div>
-              <div className="usp-card">
-                <h3>Gift ready</h3>
-                <p>Minimal packaging with a beautifully detailed boutique receipt.</p>
+          {/* Trust Badges Section */}
+          <section className="trust-badges-section" style={{
+            padding: '32px 0',
+            borderBottom: '1px solid var(--border-primary)',
+            borderTop: '1px solid var(--border-primary)',
+            backgroundColor: 'transparent',
+            marginBottom: '40px'
+          }}>
+            <div className="container" style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '40px',
+              maxWidth: '1000px',
+              margin: '0 auto'
+            }}>
+              <span style={{fontSize: '0.75rem', fontWeight: '500', letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--text-secondary)'}}>Made in the Emirates</span>
+              <span style={{color: 'var(--accent-gold)', fontSize: '0.8rem'}}>•</span>
+              <span style={{fontSize: '0.75rem', fontWeight: '500', letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--text-secondary)'}}>Curated Scent Sets</span>
+              <span style={{color: 'var(--accent-gold)', fontSize: '0.8rem'}}>•</span>
+              <span style={{fontSize: '0.75rem', fontWeight: '500', letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--text-secondary)'}}>Gift-ready presentation</span>
+              <span style={{color: 'var(--accent-gold)', fontSize: '0.8rem'}}>•</span>
+              <span style={{fontSize: '0.75rem', fontWeight: '500', letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--text-secondary)'}}>Long-Lasting Blends</span>
+            </div>
+          </section>
+
+          {/* How It Works Section */}
+          <section className="how-it-works-section" style={{
+            padding: '80px 0',
+            backgroundColor: 'transparent',
+            borderBottom: '1px solid var(--border-primary)',
+            marginBottom: '80px'
+          }}>
+            <div className="container" style={{maxWidth: '1000px', margin: '0 auto'}}>
+              <span className="section-category" style={{color: 'var(--accent-gold)', display: 'block', textAlign: 'center', marginBottom: '8px', letterSpacing: '2px', fontSize: '0.8rem'}}>THE EXPERIENCE</span>
+              <h2 className="font-serif section-title" style={{textAlign: 'center', fontSize: '2.4rem', marginBottom: '60px', fontWeight: '300'}}>How It Works</h2>
+              
+              <div className="how-it-works-timeline" style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                gap: '48px',
+                position: 'relative'
+              }}>
+                {/* Step 1 */}
+                <div style={{ textAlign: 'center', padding: '0 20px' }}>
+                  <h4 className="font-serif" style={{ fontSize: '1.25rem', color: 'var(--text-primary)', marginBottom: '16px', fontWeight: '400', letterSpacing: '0.5px' }}>1. Explore the ELIXYR Sets</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.7', margin: 0 }}>
+                    Each set is curated around a different scent direction, from fresh daily wear to deeper evening scents.
+                  </p>
+                </div>
+                
+                {/* Step 2 */}
+                <div className="timeline-col-sep" style={{ textAlign: 'center', padding: '0 20px' }}>
+                  <h4 className="font-serif" style={{ fontSize: '1.25rem', color: 'var(--text-primary)', marginBottom: '16px', fontWeight: '400', letterSpacing: '0.5px' }}>2. Choose Your Style</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.7', margin: 0 }}>
+                    Pick the set that matches your taste, routine, or gifting need.
+                  </p>
+                </div>
+                
+                {/* Step 3 */}
+                <div className="timeline-col-sep" style={{ textAlign: 'center', padding: '0 20px' }}>
+                  <h4 className="font-serif" style={{ fontSize: '1.25rem', color: 'var(--text-primary)', marginBottom: '16px', fontWeight: '400', letterSpacing: '0.5px' }}>3. Enjoy the Full Experience</h4>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.7', margin: 0 }}>
+                    Receive a complete scent set designed to give you variety, not just one fragrance.
+                  </p>
+                </div>
               </div>
             </div>
           </section>
@@ -1560,23 +1676,92 @@ function App() {
           {/* Product Catalog Grid */}
           <section id="shop" className="catalog-section">
             <div className="container">
-              <div className="section-intro">
-                <span className="section-category">COLLECTION</span>
-                <h2 className="section-title">Perfumes made to be remembered quietly.</h2>
-                <p className="section-desc">Every bottle is hand-assembled in the UAE using premium raw ingredients, blended to maintain a lasting, elegant presence.</p>
+              <div className="section-intro" style={{textAlign: 'center', marginBottom: '40px'}}>
+                <span className="section-category" style={{color: 'var(--accent-gold)'}}>THE CATALOGUE</span>
+                <h2 className="section-title" style={{fontSize: '2.8rem', marginTop: '8px'}}>Perfumes made to be remembered quietly.</h2>
+                <p className="section-desc" style={{maxWidth: '600px', margin: '12px auto 0'}}>Every bottle is hand-assembled in the UAE using premium raw ingredients, blended to maintain a lasting, elegant presence.</p>
               </div>
 
-              <div className="catalog-tabs">
-                {['ALL FRAGRANCES', ...categories].map(tab => (
-                  <button 
-                    key={tab} 
-                    className={`tab-btn ${activeCategory === tab ? 'active' : ''}`}
-                    onClick={() => setActiveCategory(tab)}
-                  >
-                    {tab}
-                  </button>
-                ))}
+              {/* Skeuomorphic Gold Curation Tab Selector */}
+              <div className="curation-tabs-container" style={{
+                display: 'flex', 
+                justifyContent: 'center', 
+                marginBottom: '40px', 
+                gap: '16px',
+                flexWrap: 'wrap'
+              }}>
+                <button 
+                  className={`curation-tab-btn ${activeCurationView === 'sets' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveCurationView('sets');
+                    setActiveCategory('ALL FRAGRANCES');
+                  }}
+                  style={{
+                    padding: '16px 32px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase',
+                    fontFamily: 'inherit',
+                    borderRadius: '2px',
+                    border: '1px solid',
+                    borderColor: activeCurationView === 'sets' ? 'var(--accent-gold)' : 'var(--border-primary)',
+                    backgroundColor: activeCurationView === 'sets' ? 'var(--accent-gold-light)' : 'transparent',
+                    color: activeCurationView === 'sets' ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: activeCurationView === 'sets' ? '0 4px 15px rgba(212, 175, 55, 0.1)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  Curated Scent Sets
+                </button>
+                <button 
+                  className={`curation-tab-btn ${activeCurationView === 'scents' ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveCurationView('scents');
+                    setActiveCategory('ALL FRAGRANCES');
+                  }}
+                  style={{
+                    padding: '16px 32px',
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    letterSpacing: '2px',
+                    textTransform: 'uppercase',
+                    fontFamily: 'inherit',
+                    borderRadius: '2px',
+                    border: '1px solid',
+                    borderColor: activeCurationView === 'scents' ? 'var(--accent-gold)' : 'var(--border-primary)',
+                    backgroundColor: activeCurationView === 'scents' ? 'var(--accent-gold-light)' : 'transparent',
+                    color: activeCurationView === 'scents' ? 'var(--accent-gold)' : 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    boxShadow: activeCurationView === 'scents' ? '0 4px 15px rgba(212, 175, 55, 0.1)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  Signature Scents
+                </button>
               </div>
+
+              {/* Sub-categories visible only under individual signature scents view */}
+              {activeCurationView === 'scents' && (
+                <div className="catalog-tabs" style={{marginBottom: '32px', animation: 'fadeIn 0.3s ease'}}>
+                  {['ALL FRAGRANCES', ...categories].map(tab => (
+                    <button 
+                      key={tab} 
+                      className={`tab-btn ${activeCategory === tab ? 'active' : ''}`}
+                      onClick={() => setActiveCategory(tab)}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              )}
 
 
               {/* Search Active Indicator */}
@@ -1734,120 +1919,125 @@ function App() {
                   </button>
                 </div>
               ) : (
-                <div className="product-grid">
-                  {filteredProducts.map(product => (
-                    <article key={product.id} className="product-card">
-                      <div className="product-img-wrapper" style={{cursor: 'pointer'}} onClick={() => navigateTo(`/${product.slug}`)}>
-                        <img src={product.images[0]} alt={product.name} className="product-img" />
-                        {product.scarcity_note && (
-                          <span className="card-scarcity-tag">{product.scarcity_note}</span>
-                        )}
-                        {product.stock_status === 'out_of_stock' && (
-                          <span className="card-scarcity-tag" style={{backgroundColor: '#e74c3c', color: '#fff'}}>OUT OF STOCK</span>
-                        )}
-                      </div>
-                      
-                      <div className="product-info">
-                        <span className="product-scent-family">{product.scent_family}</span>
-                        <h3 className="product-title" style={{cursor: 'pointer'}} onClick={() => navigateTo(`/${product.slug}`)}>
-                          {product.name}
-                        </h3>
-                        <p className="product-notes">{product.key_notes.join(', ')}</p>
-                        
-                        {/* Scent sliders gauges */}
-                        <div className="scent-gauges-container">
-                          <div className="scent-gauge-row">
-                            <span className="gauge-label">Sillage</span>
-                            <div className="gauge-bar-bg">
-                              <div className="gauge-bar-fill" style={{width: `${product.sillage || 70}%`}}></div>
+                <div>
+                  {activeCurationView === 'sets' ? (
+                    <div className="product-grid" style={{animation: 'fadeIn 0.5s ease'}}>
+                      {mockCuratedSets.map(set => {
+                        const isAdded = recentlyAddedId === set.id;
+                        return (
+                          <article 
+                            key={set.id} 
+                            className="product-card set-card" 
+                            style={{border: '1px solid var(--accent-gold)', cursor: 'pointer'}}
+                            onClick={() => setActiveSetDetail(set)}
+                          >
+                            <div className="product-img-wrapper">
+                              <img src={set.images[0]} alt={set.name} className="product-img" />
+                              <span className="card-scarcity-tag" style={{backgroundColor: 'var(--accent-gold)', color: '#000'}}>CURATED SET</span>
                             </div>
-                            <span className="gauge-value-desc">
-                              {product.sillage > 80 ? 'Powerful' : product.sillage > 50 ? 'Strong' : 'Intimate'}
-                            </span>
-                          </div>
+                            
+                            <div className="product-info">
+                              <span className="product-scent-family">{set.scent_direction}</span>
+                              <h3 className="product-title">
+                                {set.name}
+                              </h3>
 
-                          <div className="scent-gauge-row">
-                            <span className="gauge-label">Longevity</span>
-                            <div className="gauge-bar-bg">
-                              <div className="gauge-bar-fill" style={{width: `${product.longevity || 75}%`}}></div>
+                              <div className="product-footer" style={{borderTop: 'none', paddingTop: '0'}}>
+                                <span className="product-price">{set.price} AED</span>
+                                <div className="product-actions-btn-group">
+                                  <button 
+                                    className="btn btn-secondary btn-card-action"
+                                    onClick={(e) => { e.stopPropagation(); setActiveSetDetail(set); }}
+                                  >
+                                    EXPLORE SET
+                                  </button>
+                                  <button 
+                                    className="btn btn-primary btn-card-action"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      addToCart(set);
+                                    }}
+                                    style={{
+                                      backgroundColor: isAdded ? 'var(--accent-gold-light)' : '',
+                                      color: isAdded ? 'var(--accent-gold)' : '',
+                                      borderColor: isAdded ? 'var(--accent-gold)' : ''
+                                    }}
+                                  >
+                                    {isAdded ? 'ADDED!' : 'ADD'}
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                            <span className="gauge-value-desc">
-                              {product.longevity > 85 ? 'Infinite' : product.longevity > 60 ? 'Long' : 'Moderate'}
-                            </span>
-                          </div>
-                        </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="product-grid" style={{animation: 'fadeIn 0.5s ease'}}>
+                      {filteredProducts.map(product => {
+                        const isAdded = recentlyAddedId === product.id;
+                        return (
+                          <article 
+                            key={product.id} 
+                            className="product-card"
+                            style={{cursor: 'pointer'}}
+                            onClick={() => navigateTo(`/${product.slug}`)}
+                          >
+                            <div className="product-img-wrapper">
+                              <img src={product.images[0]} alt={product.name} className="product-img" />
+                              {product.scarcity_note && (
+                                <span className="card-scarcity-tag">{product.scarcity_note}</span>
+                              )}
+                              {product.stock_status === 'out_of_stock' && (
+                                <span className="card-scarcity-tag" style={{backgroundColor: '#e74c3c', color: '#fff'}}>OUT OF STOCK</span>
+                              )}
+                            </div>
+                            
+                            <div className="product-info">
+                              <span className="product-scent-family">{product.scent_family}</span>
+                              <h3 className="product-title">
+                                {product.name}
+                              </h3>
+                              <p className="product-notes">{product.key_notes.join(', ')}</p>
 
-                        <div className="product-footer">
-                          <span className="product-price">{product.price} AED</span>
-                          <div className="product-actions-btn-group">
-                            <button 
-                              className="btn btn-secondary btn-card-action"
-                              onClick={() => navigateTo(`/${product.slug}`)}
-                            >
-                              DISCOVER
-                            </button>
-                            <button 
-                              className="btn btn-primary btn-card-action"
-                              disabled={product.stock_status === 'out_of_stock'}
-                              onClick={() => addToCart(product)}
-                              style={{
-                                backgroundColor: recentlyAddedId === product.id ? 'var(--accent-gold-light)' : '',
-                                color: recentlyAddedId === product.id ? 'var(--accent-gold)' : '',
-                                borderColor: recentlyAddedId === product.id ? 'var(--accent-gold)' : ''
-                              }}
-                            >
-                              {product.stock_status === 'out_of_stock' 
-                                ? 'OUT' 
-                                : recentlyAddedId === product.id 
-                                  ? 'ADDED!' 
-                                  : 'ADD'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </article>
-                  ))}
+                              <div className="product-footer">
+                                <span className="product-price">{product.price} AED</span>
+                                <div className="product-actions-btn-group">
+                                  <button 
+                                    className="btn btn-secondary btn-card-action"
+                                    onClick={(e) => { e.stopPropagation(); navigateTo(`/${product.slug}`); }}
+                                  >
+                                    VIEW SCENT
+                                  </button>
+                                  <button 
+                                    className="btn btn-primary btn-card-action"
+                                    disabled={product.stock_status === 'out_of_stock'}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      addToCart(product);
+                                    }}
+                                    style={{
+                                      backgroundColor: isAdded ? 'var(--accent-gold-light)' : '',
+                                      color: isAdded ? 'var(--accent-gold)' : '',
+                                      borderColor: isAdded ? 'var(--accent-gold)' : ''
+                                    }}
+                                  >
+                                    {product.stock_status === 'out_of_stock' 
+                                      ? 'OUT' 
+                                      : isAdded 
+                                        ? 'ADDED!' 
+                                        : 'ADD'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          </section>
-
-          {/* Discovery set banner */}
-          <section id="discovery" className="container">
-            <div className="discovery-section">
-              <div className="container discovery-grid">
-                <div>
-                  <span className="section-category" style={{color: 'var(--accent-gold)'}}>DISCOVERY SET</span>
-                  <h2 className="font-serif" style={{fontSize: '2.5rem', marginBottom: '12px'}}>Elixyr Discovery Set</h2>
-                  <p style={{fontSize: '0.85rem', color: '#B2AAA0', marginBottom: '24px', lineHeight: '1.6'}}>
-                    Test the complete Elixyr portfolio. A luxurious gold-embossed presentation box holding 2ml spray vials of our Oud, Musk, Amber, Dubai Meydan, and Signature blends.
-                  </p>
-                  
-                  <div style={{display: 'flex', alignItems: 'center', gap: '24px'}}>
-                    <span className="font-serif" style={{fontSize: '2rem', fontWeight: 'bold'}}>{mockDiscoverySet.price} AED</span>
-                    <button 
-                      className="btn btn-primary" 
-                      style={{
-                        backgroundColor: recentlyAddedId === mockDiscoverySet.id ? 'var(--accent-gold-light)' : '#FAF9F5',
-                        color: recentlyAddedId === mockDiscoverySet.id ? 'var(--accent-gold)' : '#0E0E0D',
-                        border: recentlyAddedId === mockDiscoverySet.id ? '1px solid var(--accent-gold)' : 'none'
-                      }}
-                      onClick={() => addToCart(mockDiscoverySet)}
-                    >
-                      {recentlyAddedId === mockDiscoverySet.id ? 'ADDED TO CART!' : 'ADD TO CART'}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="discovery-vials-grid">
-                  {mockDiscoverySet.vials.map(v => (
-                    <div key={v.name} className="vial-card">
-                      <div className="vial-name">{v.name}</div>
-                      <div className="vial-desc">{v.notes}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
           </section>
 
@@ -2107,7 +2297,7 @@ function App() {
             {/* Scent story descriptions */}
             <div className="hero-content" style={{textAlign: 'left'}}>
               <span className="section-category">{activeProduct.scent_family}</span>
-              <h1 style={{fontSize: '3.5rem', marginBottom: '8px', fontWeight: '300'}}>{activeProduct.name}</h1>
+              <h1 className="product-title-detail" style={{marginBottom: '8px', fontWeight: '300'}}>{activeProduct.name}</h1>
               <p style={{fontSize: '1.25rem', fontFamily: 'var(--font-serif)', color: 'var(--accent-gold)', marginBottom: '16px'}}>
                 {activeProduct.key_notes.join(' • ')}
               </p>
@@ -2159,7 +2349,7 @@ function App() {
                 </div>
               </div>
 
-              <div style={{display: 'flex', alignItems: 'center', gap: '32px'}}>
+              <div className="product-purchase-row" style={{display: 'flex', alignItems: 'center', gap: '32px'}}>
                 <span className="font-serif" style={{fontSize: '2.2rem', fontWeight: 'bold'}}>{activeProduct.price} AED</span>
                 <button 
                   className="btn btn-primary"
@@ -2986,9 +3176,203 @@ function App() {
         </main>
       )}
 
+      {/* ROUTE: DEDICATED GIFTING CURATION PAGE ('/gifting') */}
+      {currentRoute === '/gifting' && (
+        <main className="container animate-fade-in" style={{paddingTop: 'var(--space-xl)', paddingBottom: 'var(--space-2xl)'}}>
+          <div style={{fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '1.5px', marginBottom: '16px', display: 'flex', gap: '8px', alignItems: 'center'}}>
+            <span onClick={() => navigateTo('/')} style={{cursor: 'pointer', transition: 'color 0.2s'}} onMouseEnter={e => e.target.style.color = 'var(--accent-gold)'} onMouseLeave={e => e.target.style.color = ''}>Home</span>
+            <span>/</span>
+            <span style={{color: 'var(--text-primary)'}}>Gifting</span>
+          </div>
+
+          <div className="section-intro" style={{textAlign: 'center', marginBottom: 'var(--space-2xl)'}}>
+            <span className="section-category" style={{color: 'var(--accent-gold)'}}>LUXURY EXPERIENCE</span>
+            <h1 className="font-serif" style={{fontSize: '3.5rem', fontWeight: '300', marginTop: '8px'}}>Gifting Made Simple</h1>
+            <p style={{maxWidth: '600px', margin: '16px auto 0', color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: '1.6'}}>
+              Choose curated ELIXYR scent sets designed for different scent styles, moments, and gifting needs.
+            </p>
+          </div>
+
+          <div className="product-grid" style={{marginBottom: '64px'}}>
+            {mockCuratedSets.map(set => {
+              const isAdded = recentlyAddedId === set.id;
+              return (
+                <article 
+                  key={set.id} 
+                  className="product-card set-card" 
+                  style={{border: '1px solid var(--accent-gold)', cursor: 'pointer'}}
+                  onClick={() => setActiveSetDetail(set)}
+                >
+                  <div className="product-img-wrapper">
+                    <img src={set.images[0]} alt={set.name} className="product-img" />
+                    <span className="card-scarcity-tag" style={{backgroundColor: 'var(--accent-gold)', color: '#000'}}>GIFT SELECTION</span>
+                  </div>
+                  
+                  <div className="product-info">
+                    <span className="product-scent-family">{set.scent_direction}</span>
+                    <h3 className="product-title">
+                      {set.name}
+                    </h3>
+
+                    <div className="product-footer" style={{borderTop: 'none', paddingTop: '0'}}>
+                      <span className="product-price">{set.price} AED</span>
+                      <div className="product-actions-btn-group">
+                        <button 
+                          className="btn btn-secondary btn-card-action"
+                          onClick={(e) => { e.stopPropagation(); setActiveSetDetail(set); }}
+                        >
+                          EXPLORE
+                        </button>
+                        <button 
+                          className="btn btn-primary btn-card-action"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            addToCart(set);
+                          }}
+                          style={{
+                            backgroundColor: isAdded ? 'var(--accent-gold-light)' : '',
+                            color: isAdded ? 'var(--accent-gold)' : '',
+                            borderColor: isAdded ? 'var(--accent-gold)' : ''
+                          }}
+                        >
+                          {isAdded ? 'ADDED!' : 'GIFT THIS SET'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Corporate Gifting supporting section */}
+          <div className="corporate-gifting-banner" style={{
+            padding: '40px',
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-primary)',
+            borderRadius: '4px',
+            textAlign: 'center',
+            maxWidth: '800px',
+            margin: '0 auto 40px auto',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <span className="section-category" style={{color: 'var(--accent-gold)', letterSpacing: '2px'}}>CORPORATE CURATIONS</span>
+            <h2 className="font-serif" style={{fontSize: '2rem', marginTop: '8px', marginBottom: '12px'}}>Corporate & Bespoke Gifting</h2>
+            <p style={{fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '560px', margin: '0 auto 24px auto', lineHeight: '1.6'}}>
+              Honor your guests, VIP business partners, or corporate delegates with customized ELIXYR fragrance sets. We offer custom brass-plate labeling, customized olfactory seals, and private concierge delivery within the Emirates.
+            </p>
+            <a 
+              href="mailto:contact@elixyr.ae?subject=Corporate%20Gifting%20Consultation&body=Hello%20Elixyr%20Concierge,%0A%0AI%20would%20like%20to%20request%20information%20regarding%20bespoke%20corporate%20gifting..." 
+              className="btn btn-secondary" 
+              style={{border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', textDecoration: 'none', padding: '12px 28px', display: 'inline-block'}}
+            >
+              Contact Corporate Concierge
+            </a>
+          </div>
+        </main>
+      )}
+
+      {/* ROUTE: SHIPPING & DELIVERY VIEW ('/shipping') */}
+      {currentRoute === '/shipping' && (
+        <main className="container" style={{padding: 'var(--space-2xl) var(--space-md)', maxWidth: '800px'}}>
+          <div style={{textAlign: 'left', marginTop: '40px'}}>
+            <span className="section-category">ATELIER LOGISTICS</span>
+            <h1 className="font-serif" style={{fontSize: '3rem', marginBottom: '24px', fontWeight: '300'}}>Shipping & Delivery</h1>
+            <p style={{color: 'var(--accent-gold)', textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.75rem', fontWeight: '600', marginBottom: '40px'}}>Complementary Delivery on Curated Collections</p>
+            
+            <div style={{color: 'var(--text-secondary)', lineHeight: '1.8', display: 'flex', flexDirection: 'column', gap: '30px', fontSize: '0.85rem'}}>
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>1. Handcrafted Curation & Dispatch</h4>
+                <p>
+                  Every ELIXYR fragrance is blended, hand-poured, and carefully packaged inside our independent Dubai workshop. Due to the high caliber and artisanal nature of our oils, orders are individually inspected and dispatched within 24 hours of checkout.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>2. Delivery Timelines inside the Emirates</h4>
+                <p>
+                  We provide premium tracked delivery across all seven Emirates:
+                </p>
+                <ul style={{marginTop: '12px', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                  <li><strong>Dubai, Sharjah, Ajman:</strong> 1 to 2 business days.</li>
+                  <li><strong>Abu Dhabi, Al Ain, Ras Al Khaimah, Fujairah, Umm Al Quwain:</strong> 2 to 3 business days.</li>
+                </ul>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>3. Real-Time Tracking & WhatsApp Concierge</h4>
+                <p>
+                  As soon as your set is sealed and dispatched, a secure tracking link will be updated on your order page. Our courier partner or concierge will contact you via WhatsApp or SMS to coordinate your exact preferred delivery window.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>4. Complimentary Delivery</h4>
+                <p>
+                  We offer complimentary express delivery across the UAE for all curated scent sets, or any standard shopping bag exceeding 300 AED. For single bottle or smaller orders, a flat delivery fee of 20 AED is applied at checkout.
+                </p>
+              </section>
+            </div>
+
+            <div style={{marginTop: '50px'}}>
+              <button className="btn btn-secondary" onClick={() => navigateTo('/')} style={{padding: '12px 30px', fontSize: '0.7rem', letterSpacing: '2px'}}>
+                RETURN TO SHOP
+              </button>
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* ROUTE: RETURNS & EXCHANGE VIEW ('/returns') */}
+      {currentRoute === '/returns' && (
+        <main className="container" style={{padding: 'var(--space-2xl) var(--space-md)', maxWidth: '800px'}}>
+          <div style={{textAlign: 'left', marginTop: '40px'}}>
+            <span className="section-category">CLIENT ASSURANCE</span>
+            <h1 className="font-serif" style={{fontSize: '3rem', marginBottom: '24px', fontWeight: '300'}}>Returns & Exchange</h1>
+            <p style={{color: 'var(--accent-gold)', textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.75rem', fontWeight: '600', marginBottom: '40px'}}>Sovereign Satisfaction Guarantee</p>
+            
+            <div style={{color: 'var(--text-secondary)', lineHeight: '1.8', display: 'flex', flexDirection: 'column', gap: '30px', fontSize: '0.85rem'}}>
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>1. Our Quality Standards</h4>
+                <p>
+                  At ELIXYR, each extrait and curated scent set is assembled using highly precious, pure fragrance oils. To guarantee absolute pristine condition and safety, every full-size bottle is encased in our golden-sealed gift packaging.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>2. 14-Day Sealed Returns</h4>
+                <p>
+                  We offer a complete 14-day exchange or boutique store credit for any unopened, sealed products in their original luxury gift box. We cannot accept returns or exchanges for bottles that have had their outer golden security seal broken.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>3. Discovery Set Policy</h4>
+                <p>
+                  To explore our olfactory catalog before committing to a full-size set, we highly recommend trying the Sovereign Discovery Set. This allows you to experience five extraits in 2ml spray vials.
+                </p>
+              </section>
+
+              <section>
+                <h4 className="font-serif" style={{color: 'var(--text-primary)', fontSize: '1.25rem', marginBottom: '12px', fontWeight: '400'}}>4. Initiating an Exchange</h4>
+                <p>
+                  To coordinate a swift return or product exchange, contact our boutique concierge team directly via WhatsApp at <strong>+971 52 123 4567</strong> or by emailing <strong>contact@elixyr.ae</strong> with your unique order reference.
+                </p>
+              </section>
+            </div>
+
+            <div style={{marginTop: '50px'}}>
+              <button className="btn btn-secondary" onClick={() => navigateTo('/')} style={{padding: '12px 30px', fontSize: '0.7rem', letterSpacing: '2px'}}>
+                RETURN TO SHOP
+              </button>
+            </div>
+          </div>
+        </main>
+      )}
+
       {/* ROUTE: PRIVACY POLICY VIEW ('/privacy') */}
       {currentRoute === '/privacy' && (
-        <main className="container" style={{padding: 'var(--space-2xl) 0', maxWidth: '800px'}}>
+        <main className="container" style={{padding: 'var(--space-2xl) var(--space-md)', maxWidth: '800px'}}>
           <div style={{textAlign: 'left', marginTop: '40px'}}>
             <span className="section-category">LEGAL PORTAL</span>
             <h1 className="font-serif" style={{fontSize: '3rem', marginBottom: '24px', fontWeight: '300'}}>Privacy Policy</h1>
@@ -3035,7 +3419,7 @@ function App() {
 
       {/* ROUTE: TERMS OF SERVICE VIEW ('/terms') */}
       {currentRoute === '/terms' && (
-        <main className="container" style={{padding: 'var(--space-2xl) 0', maxWidth: '800px'}}>
+        <main className="container" style={{padding: 'var(--space-2xl) var(--space-md)', maxWidth: '800px'}}>
           <div style={{textAlign: 'left', marginTop: '40px'}}>
             <span className="section-category">LEGAL PORTAL</span>
             <h1 className="font-serif" style={{fontSize: '3rem', marginBottom: '24px', fontWeight: '300'}}>Terms of Service</h1>
@@ -4665,24 +5049,101 @@ function App() {
         </div>
       )}
 
+      {/* --- DYNAMIC CURATED SET DETAIL OVERLAY MODAL --- */}
+      {activeSetDetail && (
+        <div className="overlay-container" onClick={() => setActiveSetDetail(null)}>
+          <div className="blog-reader-modal" onClick={e => e.stopPropagation()} style={{maxWidth: '800px'}}>
+            <button className="close-btn" onClick={() => setActiveSetDetail(null)}>×</button>
+            
+            <div className="set-detail-modal-grid" style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', alignItems: 'start', marginTop: '20px'}}>
+              <div className="set-detail-visual">
+                <div className="bottle-img-wrapper" style={{aspectRatio: '1', borderRadius: '4px', overflow: 'hidden'}}>
+                  <img src={activeSetDetail.images[0]} alt={activeSetDetail.name} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+                </div>
+                <div style={{marginTop: '20px', backgroundColor: 'var(--accent-gold-light)', padding: '16px', borderRadius: '4px', border: '1px solid var(--accent-gold)'}}>
+                  <span className="section-category" style={{color: 'var(--accent-gold)', display: 'block', fontSize: '0.65rem', marginBottom: '4px'}}>GIFTING HARMONY</span>
+                  <p style={{fontSize: '0.8rem', color: 'var(--text-primary)', margin: 0, fontStyle: 'italic'}}>
+                    "{activeSetDetail.why_it_works_as_gift}"
+                  </p>
+                </div>
+              </div>
+              
+              <div className="set-detail-info">
+                <span className="section-category" style={{color: 'var(--accent-gold)'}}>ELIXYR CURATED SET</span>
+                <h2 className="font-serif" style={{fontSize: '2.2rem', marginTop: '4px', marginBottom: '8px'}}>{activeSetDetail.name}</h2>
+                <span className="font-serif" style={{fontSize: '1.6rem', color: 'var(--accent-gold)', fontWeight: 'bold', display: 'block', marginBottom: '16px'}}>{activeSetDetail.price} AED</span>
+                
+                <p style={{fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '20px'}}>
+                  {activeSetDetail.description}
+                </p>
+                
+                <div style={{marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px'}}>
+                  <div style={{fontSize: '0.8rem'}}>
+                    <strong>Scent Direction:</strong> <span style={{color: 'var(--text-secondary)'}}>{activeSetDetail.scent_direction}</span>
+                  </div>
+                  <div style={{fontSize: '0.8rem'}}>
+                    <strong>Best For:</strong> <span style={{color: 'var(--text-secondary)'}}>{activeSetDetail.best_for}</span>
+                  </div>
+                  <div style={{fontSize: '0.8rem'}}>
+                    <strong>Best Suited For:</strong> <span style={{color: 'var(--text-secondary)'}}>{activeSetDetail.best_suited_for}</span>
+                  </div>
+                </div>
+
+                <div style={{borderTop: '1px solid var(--border-primary)', paddingTop: '16px', marginBottom: '24px'}}>
+                  <h4 className="font-serif" style={{fontSize: '1.1rem', marginBottom: '12px', letterSpacing: '1px'}}>Included In This Curation:</h4>
+                  <div style={{display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                    {activeSetDetail.scents_list.map((item, idx) => (
+                      <div key={idx} style={{display: 'flex', justifyContent: 'space-between', padding: '8px 12px', backgroundColor: 'var(--bg-secondary)', borderRadius: '2px', borderLeft: '3px solid var(--accent-gold)'}}>
+                        <span style={{fontSize: '0.8rem', fontWeight: '600'}}>{item.name}</span>
+                        <span style={{fontSize: '0.75rem', color: 'var(--text-secondary)'}}>{item.description}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div style={{display: 'flex', gap: '12px'}}>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{flex: 1}}
+                    onClick={() => {
+                      addToCart(activeSetDetail);
+                      setActiveSetDetail(null);
+                    }}
+                  >
+                    Add Complete Set to Cart
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setActiveSetDetail(null)}
+                    style={{border: '1px solid var(--border-primary)'}}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- DYNAMIC INTERACTIVE VIRTUAL SCENT SOMMELIER QUIZ MODAL OVERLAY --- */}
       {isQuizOpen && (
         <div className="overlay-container" onClick={() => setIsQuizOpen(false)}>
-          <div className="blog-reader-modal" onClick={e => e.stopPropagation()} style={{maxWidth: '700px'}}>
+          <div className="blog-reader-modal quiz-modal" onClick={e => e.stopPropagation()} style={{maxWidth: '700px'}}>
             <button className="close-btn" onClick={() => setIsQuizOpen(false)}>×</button>
             
             {/* Step 0: Welcome Frame */}
             {quizStep === 0 && (
-              <div style={{textAlign: 'center', padding: '10px 0'}}>
+              <div style={{textAlign: 'center', padding: '5px 0'}}>
                 <img 
                   src={sommelierBlotters} 
                   alt="Virtual Scent Sommelier" 
                   className="quiz-welcome-img"
-                  style={{borderRadius: '4px', marginBottom: '20px', width: '100%', maxHeight: '240px', objectFit: 'cover'}}
+                  style={{borderRadius: '4px', marginBottom: '12px', width: '100%', maxHeight: '150px', objectFit: 'cover'}}
                 />
                 <span className="section-category" style={{color: 'var(--accent-gold)', fontWeight: '700'}}>VIRTUAL SOMMELIER</span>
-                <h2 className="font-serif" style={{fontSize: '2.4rem', marginTop: '8px', marginBottom: '12px'}}>Your Olfactory Consultation</h2>
-                <p style={{fontSize: '0.9rem', color: 'var(--text-secondary)', maxWidth: '520px', margin: '0 auto var(--space-md)', lineHeight: '1.7', fontStyle: 'italic'}}>
+                <h2 className="font-serif" style={{fontSize: '1.8rem', marginTop: '6px', marginBottom: '10px'}}>Your Olfactory Consultation</h2>
+                <p style={{fontSize: '0.82rem', color: 'var(--text-secondary)', maxWidth: '520px', margin: '0 auto 16px', lineHeight: '1.6', fontStyle: 'italic'}}>
                   "Greetings, fragrance connoisseur. I am your personal Elixyr scent sommelier. Allow me to guide you through a sensory exploration. By sharing your aesthetic preferences and the invisible aura you wish to project, we shall unveil the ultimate signature Elixyr fragrance crafted for your skin."
                 </p>
                 <button className="btn btn-primary" onClick={() => setQuizStep(1)}>
@@ -4703,11 +5164,11 @@ function App() {
 
                 {/* Question 1: Scent Silhouette (Gender) */}
                 {quizStep === 1 && (
-                  <div className="quiz-steps-wrapper">
-                    <h2 className="font-serif" style={{fontSize: '2rem', marginBottom: '8px'}}>How would you describe the olfactory poetry of your presence on the skin?</h2>
-                    <p style={{fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '24px'}}>"Tell me, how do you wish to project your presence to the world?"</p>
+                  <div className="quiz-steps-wrapper" style={{margin: '12px auto'}}>
+                    <h2 className="font-serif" style={{fontSize: '1.45rem', marginBottom: '6px'}}>How would you describe the olfactory poetry of your presence on the skin?</h2>
+                    <p style={{fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '16px'}}>"Tell me, how do you wish to project your presence to the world?"</p>
                     
-                    <div className="quiz-choices-grid">
+                    <div className="quiz-choices-grid" style={{marginTop: '12px'}}>
                       <button className="quiz-choice-btn" onClick={() => handleQuizAnswer('silhouette', 'feminine')}>
                         <span className="quiz-choice-title">An Ethereal Floral Whisper</span>
                         <span className="quiz-choice-desc">Velvety Damask rose petals cradled by warm Egyptian jasmine and soft iris powder. Whispers of clean white blooms.</span>
@@ -4726,11 +5187,11 @@ function App() {
 
                 {/* Question 2: Olfactory Niche (Family) */}
                 {quizStep === 2 && (
-                  <div className="quiz-steps-wrapper">
-                    <h2 className="font-serif" style={{fontSize: '2rem', marginBottom: '8px'}}>Which sensory memory or sanctuary makes your heart beat faster?</h2>
-                    <p style={{fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '24px'}}>"Close your eyes and select the notes that speak to your memory."</p>
+                  <div className="quiz-steps-wrapper" style={{margin: '12px auto'}}>
+                    <h2 className="font-serif" style={{fontSize: '1.45rem', marginBottom: '6px'}}>Which sensory memory or sanctuary makes your heart beat faster?</h2>
+                    <p style={{fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '16px'}}>"Close your eyes and select the notes that speak to your memory."</p>
                     
-                    <div className="quiz-choices-grid">
+                    <div className="quiz-choices-grid" style={{marginTop: '12px'}}>
                       <button className="quiz-choice-btn" onClick={() => handleQuizAnswer('niche', 'deep')}>
                         <span className="quiz-choice-title">The Sanctuary of Ancient Majlis</span>
                         <span className="quiz-choice-desc">Rich incense smoke melting over aged wood logs, warm honeyed amber resins, and dry black leather.</span>
@@ -4749,11 +5210,11 @@ function App() {
 
                 {/* Question 3: Scent Intensity (Sillage) */}
                 {quizStep === 3 && (
-                  <div className="quiz-steps-wrapper">
-                    <h2 className="font-serif" style={{fontSize: '2rem', marginBottom: '8px'}}>How do you wish your fragrance to write its final, lingering story in the room?</h2>
-                    <p style={{fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '24px'}}>"How far do you want your signature trail to travel through the air?"</p>
+                  <div className="quiz-steps-wrapper" style={{margin: '12px auto'}}>
+                    <h2 className="font-serif" style={{fontSize: '1.45rem', marginBottom: '6px'}}>How do you wish your fragrance to write its final, lingering story in the room?</h2>
+                    <p style={{fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '16px'}}>"How far do you want your signature trail to travel through the air?"</p>
                     
-                    <div className="quiz-choices-grid">
+                    <div className="quiz-choices-grid" style={{marginTop: '12px'}}>
                       <button className="quiz-choice-btn" onClick={() => handleQuizAnswer('intensity', 'quiet')}>
                         <span className="quiz-choice-title">An Intimate, Private Secret</span>
                         <span className="quiz-choice-desc">Rests closely against the skin. An exquisite whisper only discovered during the closeness of a warm embrace.</span>
@@ -4774,27 +5235,27 @@ function App() {
 
             {/* Step 4: The Revelation Match */}
             {quizStep === 4 && matchedProduct && (
-              <div style={{textAlign: 'center', padding: '10px 0'}}>
+              <div style={{textAlign: 'center', padding: '5px 0'}}>
                 <span className="section-category" style={{color: 'var(--accent-gold)', fontWeight: '700'}}>THE CONCIERGE RECOMMENDATION</span>
-                <h2 className="font-serif" style={{fontSize: '2.6rem', marginTop: '6px', marginBottom: '8px'}}>Your Olfactory Signature</h2>
+                <h2 className="font-serif" style={{fontSize: '1.8rem', marginTop: '4px', marginBottom: '6px'}}>Your Olfactory Signature</h2>
                 
-                <div className="quiz-match-card" style={{display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px', alignItems: 'center', backgroundColor: 'var(--bg-secondary)', padding: '24px', borderRadius: '4px', textAlign: 'left', marginTop: '20px', border: '1px solid var(--border-primary)'}}>
+                <div className="quiz-match-card" style={{display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '16px', alignItems: 'center', backgroundColor: 'var(--bg-secondary)', padding: '16px', borderRadius: '4px', textAlign: 'left', marginTop: '12px', border: '1px solid var(--border-primary)'}}>
                   <div className="bottle-img-wrapper" style={{aspectRatio: '1', borderRadius: '4px', overflow: 'hidden'}}>
                     <img src={matchedProduct.images[0]} alt={matchedProduct.name} className="quiz-match-img" style={{width: '100%', height: '100%', objectFit: 'cover'}} />
                   </div>
                   <div>
                     <span className="product-scent-family" style={{fontSize: '0.65rem', color: 'var(--accent-gold)', letterSpacing: '1.5px', textTransform: 'uppercase', fontWeight: '700'}}>{matchedProduct.scent_family}</span>
-                    <h3 className="font-serif" style={{fontSize: '1.8rem', marginTop: '4px', marginBottom: '8px', color: 'var(--text-primary)'}}>{matchedProduct.name}</h3>
-                    <p style={{fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '16px', fontStyle: 'italic', borderLeft: '2px solid var(--accent-gold)', paddingLeft: '12px'}}>
+                    <h3 className="font-serif" style={{fontSize: '1.45rem', marginTop: '4px', marginBottom: '4px', color: 'var(--text-primary)'}}>{matchedProduct.name}</h3>
+                    <p style={{fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '10px', fontStyle: 'italic', borderLeft: '2px solid var(--accent-gold)', paddingLeft: '12px'}}>
                       "Based on your profile, I highly recommend {matchedProduct.name}. It perfectly aligns with your desire for a {matchedProduct.scent_family.toLowerCase()} presence. Hand-batched with {matchedProduct.key_notes.join(' and ')}, it will bind beautifully with your skin chemistry to create an addictive, unforgettable trail."
                     </p>
-                    <p style={{fontSize: '0.8rem', color: 'var(--text-tertiary)'}}>
+                    <p style={{fontSize: '0.75rem', color: 'var(--text-tertiary)'}}>
                       <strong>Key Blends:</strong> {matchedProduct.scent_mixes || 'Rare flower and wood extracts'}
                     </p>
                   </div>
                 </div>
 
-                <div style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
+                <div style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '16px'}}>
                   <button 
                     className="btn btn-primary"
                     onClick={() => { addToCart(matchedProduct); setIsQuizOpen(false); }}
@@ -4813,7 +5274,7 @@ function App() {
 
                 <button 
                   onClick={resetQuiz} 
-                  style={{marginTop: '24px', fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--text-tertiary)', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', letterSpacing: '1px', textTransform: 'uppercase'}}
+                  style={{marginTop: '12px', fontSize: '0.75rem', textDecoration: 'underline', color: 'var(--text-tertiary)', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)', letterSpacing: '1px', textTransform: 'uppercase'}}
                 >
                   ← Restart Olfactory Consultation
                 </button>
@@ -5709,33 +6170,38 @@ function App() {
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <span className="font-serif" style={{ fontSize: '1.8rem', color: '#F5F2EA', letterSpacing: '2px', fontWeight: '300' }}>ELIXYR</span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--accent-gold)', letterSpacing: '1px', textTransform: 'uppercase' }}>Scent your moments</span>
               <p style={{ color: 'var(--text-tertiary)', lineHeight: '1.8', fontSize: '0.75rem', margin: 0 }}>
                 Curators of rare extraits and majestic oud blends, hand-poured in small batches in Dubai, UAE.
               </p>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Collections</h5>
+              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Collections & Curation</h5>
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', padding: 0, margin: 0 }}>
-                <li><button onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Oud Blends</button></li>
-                <li><button onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 100); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Signature Extraits</button></li>
-                <li><button onClick={() => { navigateTo('/'); setTimeout(() => document.getElementById('discovery')?.scrollIntoView({behavior:'smooth'}), 100); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Discovery Sets</button></li>
+                <li><button onClick={() => { navigateTo('/'); setActiveCurationView('sets'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 150); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Sets</button></li>
+                <li><button onClick={() => { navigateTo('/'); setActiveCurationView('scents'); setTimeout(() => document.getElementById('shop')?.scrollIntoView({behavior:'smooth'}), 150); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Scents</button></li>
+                <li><button onClick={() => { navigateTo('/gifting'); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Gifting</button></li>
+                <li><button onClick={() => { navigateTo('/journal'); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Journal</button></li>
               </ul>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Customer Service</h5>
+              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Customer Care</h5>
               <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px', padding: 0, margin: 0 }}>
-                <li><button onClick={() => navigateTo('/wanna-see-hows-your-order-doing')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Track Order</button></li>
-                <li><button onClick={() => { setIsQuizOpen(true); resetQuiz(); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Scent Quiz</button></li>
-                <li><a href="https://wa.me/971501234567" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-tertiary)', textDecoration: 'none', fontSize: '0.75rem' }}>WhatsApp Concierge</a></li>
+                <li><button onClick={() => navigateTo('/track-order')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Track Order</button></li>
+                <li><button onClick={() => { setIsQuizOpen(true); resetQuiz(); }} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Scent Finder</button></li>
+                <li><button onClick={() => navigateTo('/shipping')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Shipping and Delivery</button></li>
+                <li><button onClick={() => navigateTo('/returns')} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: '0.75rem', padding: 0, textAlign: 'left' }}>Returns / Exchange</button></li>
               </ul>
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Atelier</h5>
+              <h5 className="font-serif" style={{ color: '#F5F2EA', fontSize: '0.95rem', fontWeight: '400', textTransform: 'uppercase', letterSpacing: '1px', margin: 0 }}>Bespoke Concierge</h5>
               <p style={{ color: 'var(--text-tertiary)', lineHeight: '1.8', fontSize: '0.75rem', margin: 0 }}>
-                An independent olfactory workshop dedicated to rare extraits and high-concentration agarwood blends. Online boutique exclusive.
+                WhatsApp: <a href="https://wa.me/971521234567" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-gold)', textDecoration: 'none' }}>+971 52 123 4567</a><br />
+                Email: <a href="mailto:contact@elixyr.ae" style={{ color: 'var(--accent-gold)', textDecoration: 'none' }}>contact@elixyr.ae</a><br /><br />
+                Online Boutique Exclusive.
               </p>
             </div>
           </div>
@@ -5754,10 +6220,310 @@ function App() {
             <span>© {new Date().getFullYear()} ELIXYR PERFUME BOUTIQUE. ALL RIGHTS RESERVED.</span>
             <div style={{ display: 'flex', gap: '20px' }}>
               <button onClick={() => navigateTo('/privacy')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 'inherit', padding: 0 }}>Privacy Policy</button>
-              <button onClick={() => navigateTo('/terms')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 'inherit', padding: 0 }}>Terms of Service</button>
+              <button onClick={() => navigateTo('/terms')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 'inherit', padding: 0 }}>Terms and Conditions</button>
             </div>
           </div>
         </footer>
+      )}
+
+
+      {/* Immersive Mobile Search Overlay - Amazon.ae High-End Model */}
+      {isMobileSearchActive && (
+        <div className="mobile-search-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          backgroundColor: 'var(--bg-primary)',
+          zIndex: 2000,
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '16px',
+          animation: 'fadeIn 0.25s ease'
+        }}>
+          {/* Search Overlay Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            paddingBottom: '16px',
+            borderBottom: '1px solid var(--border-primary)',
+            marginBottom: '16px'
+          }}>
+            <button 
+              onClick={() => {
+                setIsMobileSearchActive(false);
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                fontSize: '1.4rem',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                padding: '4px 8px'
+              }}
+              aria-label="Back"
+            >
+              ←
+            </button>
+            <div style={{ position: 'relative', flexGrow: 1 }}>
+              <input 
+                type="text" 
+                placeholder="Search premium fragrances..."
+                value={perfumeSearchQuery}
+                autoFocus
+                onChange={(e) => {
+                  setPerfumeSearchQuery(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setActiveCategory('ALL FRAGRANCES');
+                    setSubmittedSearchQuery(perfumeSearchQuery);
+                    setIsMobileSearchActive(false);
+                    setTimeout(() => {
+                      document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 16px 10px 38px',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--accent-gold)',
+                  borderRadius: '20px',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.9rem',
+                  outline: 'none'
+                }}
+              />
+              <span style={{
+                position: 'absolute',
+                left: '14px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-tertiary)',
+                fontSize: '0.85rem',
+                pointerEvents: 'none'
+              }}>
+                🔍
+              </span>
+              {perfumeSearchQuery && (
+                <button 
+                  onClick={() => setPerfumeSearchQuery('')}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-tertiary)',
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    padding: '4px'
+                  }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Search Overlay Body */}
+          <div style={{ flexGrow: 1, overflowY: 'auto' }}>
+            {perfumeSearchQuery.trim() === '' ? (
+              /* Trending & Browse mode */
+              <div>
+                <h4 className="font-serif" style={{
+                  fontSize: '0.75rem',
+                  letterSpacing: '1px',
+                  color: 'var(--accent-gold)',
+                  textTransform: 'uppercase',
+                  marginBottom: '12px',
+                  fontWeight: '600'
+                }}>
+                  Trending Searches
+                </h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '28px' }}>
+                  {['Bespoke Oud Reserve', 'Amber Royale', 'Musk Imperial', 'Dubai Meydan'].map(trend => (
+                    <button 
+                      key={trend}
+                      onClick={() => {
+                        setPerfumeSearchQuery(trend);
+                        setSubmittedSearchQuery(trend);
+                        setIsMobileSearchActive(false);
+                        setActiveCategory('ALL FRAGRANCES');
+                        setTimeout(() => {
+                          document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' });
+                        }, 100);
+                      }}
+                      style={{
+                        padding: '8px 14px',
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-primary)',
+                        borderRadius: '16px',
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      🔍 {trend}
+                    </button>
+                  ))}
+                </div>
+
+                <h4 className="font-serif" style={{
+                  fontSize: '0.75rem',
+                  letterSpacing: '1px',
+                  color: 'var(--accent-gold)',
+                  textTransform: 'uppercase',
+                  marginBottom: '12px',
+                  fontWeight: '600'
+                }}>
+                  Frequently Viewed
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+                  {products.slice(0, 4).map(p => (
+                    <div 
+                      key={p.id}
+                      onClick={() => {
+                        setIsMobileSearchActive(false);
+                        navigateTo(`/${p.slug}`);
+                      }}
+                      style={{
+                        backgroundColor: 'var(--bg-card)',
+                        border: '1px solid var(--border-primary)',
+                        borderRadius: '2px',
+                        padding: '8px',
+                        display: 'flex',
+                        gap: '8px',
+                        alignItems: 'center',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <img 
+                        src={p.images[0]} 
+                        alt={p.name} 
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          objectFit: 'cover',
+                          borderRadius: '2px'
+                        }} 
+                      />
+                      <div style={{ overflow: 'hidden' }}>
+                        <div style={{
+                          fontSize: '0.7rem',
+                          fontWeight: '600',
+                          color: 'var(--text-primary)',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden'
+                        }}>
+                          {p.name}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--accent-gold)' }}>
+                          {p.price} AED
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Suggestion Listing */
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {getSuggestions().length > 0 ? (
+                  getSuggestions().map(p => (
+                    <div 
+                      key={p.id}
+                      onClick={() => {
+                        setPerfumeSearchQuery(p.name);
+                        setSubmittedSearchQuery(p.name);
+                        setIsMobileSearchActive(false);
+                        navigateTo(`/${p.slug}`);
+                      }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '12px 6px',
+                        borderBottom: '1px solid var(--border-primary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem' }}>🔍</span>
+                        <div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: '500' }}>
+                            {p.name}
+                          </div>
+                          <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                            in <span style={{ color: 'var(--accent-gold)' }}>{p.scent_family}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {p.price} AED
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  /* Overlay Empty state featuring dynamic Transparent Chibi Arab Perfumer */
+                  <div style={{ textAlign: 'center', padding: '36px 12px' }}>
+                    <div style={{
+                      width: '120px',
+                      height: '120px',
+                      margin: '0 auto 16px auto',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(212, 175, 55, 0.05)',
+                      border: '1px dashed var(--accent-gold)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden'
+                    }}>
+                      <img 
+                        src={transparentChibiUrl || '/chibi_arab_perfumer.png'} 
+                        alt="Chibi Arab Perfumer" 
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain'
+                        }}
+                      />
+                    </div>
+                    <h4 className="font-serif" style={{ fontSize: '1.25rem', marginBottom: '8px', color: 'var(--text-primary)' }}>
+                      No Boutique Matches
+                    </h4>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', maxWidth: '280px', margin: '0 auto 16px' }}>
+                      Currently, we do not have this perfume in stock, but you can request it by contacting our email contact@elixyr.ae or WhatsApp!
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '260px', margin: '0 auto' }}>
+                      <a 
+                        href={`https://wa.me/971521234567?text=Hello%20Elixyr,%20I%20searched%20for%20"${encodeURIComponent(perfumeSearchQuery)}"%20but%20could%20not%20find%20it.%20Can%20I%20request%20this%20custom%20blend?`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary"
+                        style={{ padding: '8px 12px', fontSize: '0.65rem', justifyContent: 'center', textDecoration: 'none' }}
+                      >
+                        WhatsApp Concierge
+                      </a>
+                      <a 
+                        href={`mailto:contact@elixyr.ae?subject=Bespoke%20Scent%20Request:%20${encodeURIComponent(perfumeSearchQuery)}`}
+                        className="btn btn-secondary"
+                        style={{ padding: '8px 12px', fontSize: '0.65rem', justifyContent: 'center', border: '1px solid var(--accent-gold)', color: 'var(--accent-gold)', backgroundColor: 'transparent', textDecoration: 'none' }}
+                      >
+                        Email contact@elixyr.ae
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Premium In-App Toast Container */}

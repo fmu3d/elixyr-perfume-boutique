@@ -66,7 +66,7 @@ export const mockProducts = [
     stock_quantity: 12,
     scent_family: "Leather Woody",
     key_notes: ["Leather", "Saffron", "Patchouli"],
-    description: "Inspired by the prestigious horse racing tracks, capturing the ultimate scent of luxury leather, rich spices, and green woods.",
+    description: "Capturing the spirit of the prestigious horse racing tracks, embodying the ultimate scent of luxury leather, rich spices, and green woods.",
     scent_mixes: "Tuscan Leather chord (30%), Persian Saffron, Indonesian Patchouli, Cedarwood shavings.",
     images: ["https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&q=80&w=600"],
     sillage: 95,
@@ -397,6 +397,71 @@ export const mockDiscoverySet = {
     { name: "VANILLA", notes: "Vanilla Pod, White Musk, Caramel" }
   ]
 };
+
+export const mockCuratedSets = [
+  {
+    id: "set-001",
+    name: "The Sovereign Oud Set",
+    slug: "the-sovereign-oud-set",
+    scent_direction: "Rich, Deep Oud & Incense",
+    best_for: "Royal evenings, formal Majlis gatherings, statement wear",
+    best_suited_for: "Anyone who enjoys rich, smoky, and highly intense woody scents",
+    scents_included: "Bespoke Oud Reserve (100ml), Oud Céleste (100ml), Incense Sovereign (100ml)",
+    scents_list: [
+      { name: "Bespoke Oud Reserve", description: "Saffron, Smoked Oud, Amber" },
+      { name: "Oud Céleste", description: "White Lavender, White Oud, Olibanum" },
+      { name: "Incense Sovereign", description: "Sacred Olibanum, Warm Amber, Smoked Oud" }
+    ],
+    description: "A commanding presence of aged Cambodi agarwood and holy frankincense smoke. A majestic trio engineered for maximum projection and unmatched longevity.",
+    why_it_works_as_gift: "A prestigious gift of absolute luxury that honors the rich traditions of Middle Eastern perfumery.",
+    price: 595,
+    images: ["https://images.unsplash.com/photo-1547887537-6158d64c35b3?auto=format&fit=crop&q=80&w=600"],
+    stock_status: "in_stock",
+    stock_quantity: 12
+  },
+  {
+    id: "set-002",
+    name: "The Imperial Musk & Amber Set",
+    slug: "the-imperial-musk-amber-set",
+    scent_direction: "Soft Powdery Musk & Warm Amber",
+    best_for: "Intimate gatherings, daily signature wear, comforting warmth",
+    best_suited_for: "Anyone who enjoys soft, fresh, sweet, and amber scents",
+    scents_included: "Musk Imperial (100ml), Amber Royale (100ml), Vanilla Absolute (100ml)",
+    scents_list: [
+      { name: "Musk Imperial", description: "White Musk, Jasmine, Sandalwood" },
+      { name: "Amber Royale", description: "Labdanum, Vanilla, Benzoin" },
+      { name: "Vanilla Absolute", description: "Vanilla Pods, White Musk, Caramel" }
+    ],
+    description: "A harmonious balance of clean skin musk, opulent amber resins, and smoky Madagascar vanilla. An intimate yet distinctly sovereign fragrance journey.",
+    why_it_works_as_gift: "A warm and inviting olfactory embrace that feels incredibly personal, elegant, and comforting.",
+    price: 425,
+    images: ["https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&q=80&w=600"],
+    stock_status: "in_stock",
+    stock_quantity: 15
+  },
+  {
+    id: "set-003",
+    name: "The Sovereign Discovery Set",
+    slug: "the-sovereign-discovery-set",
+    scent_direction: "Full Olfactory House Introduction",
+    best_for: "Daily exploration, finding your signature scent, luxury travel",
+    best_suited_for: "Curious perfume lovers wishing to explore the complete range without confusion",
+    scents_included: "5 x 2ml spray vials (Bespoke Oud, Amber Royale, Musk Imperial, Dubai Meydan, Saffron Sillage)",
+    scents_list: [
+      { name: "Bespoke Oud Reserve", description: "Saffron, Smoked Oud, Amber" },
+      { name: "Amber Royale", description: "Labdanum, Vanilla, Benzoin" },
+      { name: "Musk Imperial", description: "White Musk, Jasmine, Sandalwood" },
+      { name: "Dubai Meydan", description: "Leather, Saffron, Patchouli" },
+      { name: "Saffron Sillage", description: "Saffron, Taif Rose, Cardamom" }
+    ],
+    description: "The ultimate introduction to the house of ELIXYR. Test and layer five extraordinary extraits before selecting your full signature bottle.",
+    why_it_works_as_gift: "The ultimate, elegant gift that lets them discover their own favorite scent journey.",
+    price: 95,
+    images: ["https://images.unsplash.com/photo-1523293182086-7651a899d37f?auto=format&fit=crop&q=80&w=600"],
+    stock_status: "in_stock",
+    stock_quantity: 45
+  }
+];
 
 export const mockBlogs = [
   {
